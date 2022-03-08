@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+.DS_Store
+.*.sw*
+
+build/
+
