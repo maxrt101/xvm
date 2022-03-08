@@ -9,17 +9,17 @@
  X Virtual Machine
 ```
 
-### About
-This is a custom virtual machine with custom instruction set & assmbly language.  
+## About
+This is a custom virtual machine with custom instruction set & assembly language.  
 
-### How To Install
+## How To Install
 Prerequisites: `clang` or `gcc`, `make`  
 Steps:  
   - Clone the repo
   - Run `make`
   - Run `./build/bin/xvm help`
 
-### Instruction Set
+## Instruction Set
 
 ```
 MNEMONIC      ARGS          MODES         DESC
@@ -65,7 +65,23 @@ IND - Indirect
 STK - Stack
 ```
 
-### Assembly
+## Helper Instructions
+```
+%def TYPE NAME VALUE
+%include "FILE"
+%syscall NAME NUMBER
+%data TYPE NAME VALUE...
+%repeat TYPE VALUE ADDRESS
+%repeat_until TYPE VALUE ADDRESS
+%define NAME VALUE
+%undef
+%ifdef NAME
+%ifndef NAME
+%else
+%endif
+```
+
+## Assembly
 #### Instructions
 Instruction's mnemonics are typed in followed by 0 or more parameters, that given instruction can take
 ```
@@ -156,3 +172,11 @@ To invoke a syscall use `syscall` instruction. To create an alias for syscall, u
 %syscall putc 20
 syscall putc
 ```
+
+#### Preprocessor
+xvm assembler supports C-like macros (to some extent).  
+Supported macros are `%define`, `%undef`, `%ifdef`, `%ifndef`, `%else`, `%endif`
+
+#### Code Manipulation
+`%repeat TYPE VALUE COUNT`  
+`%repeat_until TYPE VALUE ADDRESS`  
