@@ -47,8 +47,10 @@ class VM {
 
   void run();
   void stop();
+  void reset();
 
   void jump(int32_t address);
+  void call(int32_t address);
   void syscall(const std::string& name);
   void syscall(int32_t number);
   void registerSyscall(int32_t number, const std::string& name, SyscallType fn);

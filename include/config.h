@@ -68,6 +68,7 @@ Type getType(const std::string& name);
 void onUpdate(const std::string& name, CallbackType cb);
 
 void setFromString(const std::string& name, const std::string& value);
+std::string getAsString(const std::string& name);
 
 std::string getString(const std::string& name);
 int32_t getInt(const std::string& name);

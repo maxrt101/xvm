@@ -256,7 +256,7 @@ xvm::Token xvm::Assembler::character() {
 xvm::Token xvm::Assembler::number() {
   m_start = m_current;
   skipWhitespace();
-  while (isdigit(*m_current) || *m_current == 'x' || *m_current == 'b') m_current++;
+  while (isdigit(*m_current) || *m_current == 'x' || *m_current == 'b' || (*m_current >= 'a' && *m_current <= 'f')) m_current++;
   std::string str(m_start, m_current - m_start);
   if (str.find('x') != std::string::npos || str.find('b') != std::string::npos) {
     if (str[0] != '0') {
@@ -307,8 +307,12 @@ xvm::Token xvm::Assembler::getNextToken() {
   if (m_tokens[m_index+1].type == TokenType::IDENTIFIER) {
     auto itr = m_defines.find(m_tokens[m_index+1].str);
     if (itr != m_defines.end()) {
+      int line = m_tokens[m_index].line;
       m_tokens.erase(m_tokens.begin() + m_index + 1);
       m_tokens.insert(m_tokens.begin() + m_index + 1, itr->second.begin(), itr->second.end());
+      for (int i = 0; i < itr->second.size(); i++) { // Change line in replaced tokens
+        m_tokens[m_index + i + 1].line = line;
+      }
     }
   }
   return m_tokens[++m_index];
@@ -346,7 +350,7 @@ void xvm::Assembler::tokenize() {
         break;
       }
       case ';': {
-        while (*m_current != '\n') m_current++;
+        while (!isAtEnd() && *m_current != '\n') m_current++;
         m_line++;
         break;
       }
@@ -472,6 +476,8 @@ void xvm::Assembler::parse() {
         pushOpcode(STK, DUP);
       } else if (m_tokens[m_index] == "rol") {
         pushOpcode(STK, ROL);
+      } else if (m_tokens[m_index] == "rol3") {
+        pushOpcode(STK, ROL3);
       } else if (m_tokens[m_index] == "deref8") {
         if (isNextTokenOnSameLine()) {
           pushOpcode(IMM1, DEREF8);

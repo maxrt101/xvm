@@ -4,6 +4,7 @@
 %define FILE_RDWR   4
 %define FILE_CREATE 8
 %define FILE_APPEND 16
+%define FILE_PERMS  32
 
 %syscall putc       20
 %syscall readc      21

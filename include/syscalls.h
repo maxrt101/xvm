@@ -27,16 +27,34 @@
 
 #define VMX_SYSCALL_VM_GET_RAM      1
 #define VMX_SYSCALL_VM_EXPAND_RAM   2
+// #define VMX_SYSCALL_VM_CREATE_RAM_DEVICE 4
 
 #define VMX_SYSCALL_FILE_MODE_RDONLY  1
 #define VMX_SYSCALL_FILE_MODE_WRONLY  2
 #define VMX_SYSCALL_FILE_MODE_RDWR    4
 #define VMX_SYSCALL_FILE_MODE_CREATE  8
 #define VMX_SYSCALL_FILE_MODE_APPEND  16
+#define VMX_SYSCALL_FILE_READ_PERMS   32
 
 namespace xvm {
 
 void registerSyscalls(VM* vm);
+
+void sys_putc(VM*);
+void sys_readc(VM*);
+void sys_readl(VM*);
+
+void sys_open(VM*);
+void sys_close(VM*);
+void sys_read(VM*);
+void sys_write(VM*);
+
+void sys_breakpoint(VM*);
+
+namespace utils {
+std::string busReadString(xvm::VM* vm, int32_t ptr);
+int getInt(const std::string& str);
+} /* namespace utils */
 
 } /* namespace xvm */
 

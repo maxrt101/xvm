@@ -71,6 +71,11 @@ void xvm::VM::jump(int32_t address) {
   m_ip = address;
 }
 
+void xvm::VM::call(int32_t address) {
+  pushCall(m_ip);
+  jump(address);
+}
+
 void xvm::VM::syscall(const std::string& name) {
   for (auto& pair : m_syscalls) {
     if (pair.second.name == name) {
@@ -100,17 +105,20 @@ void xvm::VM::stop() {
   m_running = false;
 }
 
+void xvm::VM::reset() {
+  m_stack.reset();
+  m_callStack.reset();
+  m_ip = 0;
+}
+
 void xvm::VM::run() {
   m_running = true;
   while (m_running && m_ip < m_bus.max()) {
     uint8_t byte = next();
     if (config::getBool("debug")) {
-      //printf("0x%x 0x%x 0x%x\n", byte, abi::extractOpcode(byte), abi::extractMode(byte));
-      // printf("%04zx | %-8s %-4s\n", m_ip, abi::opCodeToString(abi::extractOpcode(byte)).c_str(), abi::addressingModeToString(abi::extractMode(byte)).c_str());
       abi::disassembleInstruction(m_ram.getBuffer(), m_ip-1); // works as shit
     }
     m_running = executeInstruction(abi::extractMode(byte), abi::extractOpcode(byte));
-    // m_ip++;
   }
 }
 
@@ -122,9 +130,7 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
       return false;
     }
     case RESET: {
-      m_stack.reset();
-      m_callStack.reset();
-      m_ip = 0;
+      reset();
       break;
     }
     case NOP: {
@@ -132,10 +138,6 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
     }
     case PUSH: {
       N32 n;
-      // n.u8[0] = next();
-      // n.u8[1] = next();
-      // n.u8[2] = next();
-      // n.u8[3] = next();
       nextInt32(n);
       m_stack.push(n.i32);
       break;
@@ -148,11 +150,20 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
       m_stack.push(m_stack.peek(0));
       break;
     }
-    case ROL: { // [b, a] -> [a, b]
+    case ROL: {
       StackType val1 = m_stack.pop();
       StackType val2 = m_stack.pop();
       m_stack.push(val1);
       m_stack.push(val2);
+      break;
+    }
+    case ROL3: { // [a, b, c] -> [c, b, a]
+      StackType val1 = m_stack.pop();
+      StackType val2 = m_stack.pop();
+      StackType val3 = m_stack.pop();
+      m_stack.push(val1);
+      m_stack.push(val2);
+      m_stack.push(val3);
       break;
     }
     case DEREF8: {
@@ -466,7 +477,7 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
       } else if (mode == STK) {
         addr.i32 = m_stack.pop();
       }
-      jump(addr.i32); // m_ip = addr.i32;
+      jump(addr.i32);
       break;
     }
     case JUMPT: {
@@ -480,12 +491,12 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
         addr.i32 = m_stack.pop();
       }
       if (condition) {
-        jump(addr.i32); // m_ip = addr.i32;
+        jump(addr.i32);
       }
       break;
     }
     case JUMPF: {
-      int32_t condition = !m_stack.pop();
+      int32_t condition = m_stack.pop();
       N32 addr;
       if (mode == IMM1 || mode == IMM2) {
         nextInt32(addr);
@@ -495,7 +506,7 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
         addr.i32 = m_stack.pop();
       }
       if (!condition) {
-        jump(addr.i32); // m_ip = addr.i32;
+        jump(addr.i32);
       }
       break;
     }
@@ -509,11 +520,10 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
         addr.i32 = m_stack.pop();
       }
       pushCall(m_ip);
-      jump(addr.i32); /// m_ip = addr.i32;
+      jump(addr.i32);
       break;
     }
     case SYSCALL: {
-      // TODO: Implement syscall table -> map<int, callback>
       N32 number;
       if (mode == IMM1 || mode == IMM2) {
         nextInt32(number);

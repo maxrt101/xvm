@@ -19,6 +19,7 @@ std::string xvm::abi::opCodeToString(OpCode opcode) {
     case POP:     return "pop";
     case DUP:     return "dup";
     case ROL:     return "rol";
+    case ROL3:    return "rol3";
     case DEREF8:  return "deref8";
     case DEREF16: return "deref16";
     case DEREF32: return "deref32";

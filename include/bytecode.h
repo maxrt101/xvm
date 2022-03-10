@@ -16,6 +16,7 @@ enum OpCode : uint8_t {
   POP,
   DUP,
   ROL,
+  ROL3,
   DEREF8,   // [ADDR]       IMM     STK
   DEREF16,  // [ADDR]       IMM     STK
   DEREF32,  // [ADDR]       IMM     STK

@@ -1,0 +1,142 @@
+
+
+;
+memcpy:   ; [dest, src, len]
+  dup
+  equ     0
+  jumpt   memcpy_end
+
+  rol3                  ; [len, src, dest]
+  rol                   ; [len, dest, src]
+  dup                   ; [len, dest, src, src]
+  deref8                ; [len, dest, src, byte]
+  rol                   ; [len, dest, byte, src]
+  rol3                  ; [len, src, byte, dest]
+  dup                   ; [len, src, byte, dest, dest]
+  rol3                  ; [len, src, dest, dest, byte]
+  store8                ; [len, src, dest]
+  inc                   ; [len, src, dest]
+  rol                   ; [len, dest, src]
+  inc                   ; [len, dest, src]
+  rol                   ; [len, src, dest]
+  rol3                  ; [dest, src, len]
+  dec
+
+  jump    memcpy
+memcpy_end:
+  pop
+  pop
+  pop
+  ret
+
+
+;
+memcmp:   ; [ptr1, ptr2, len]
+  dup
+  equ     0
+  jumpt   memcmp_end
+
+  rol3                  ; [len, ptr2, ptr1]
+  dup                   ; [len, ptr2, ptr1, ptr1]
+  deref8                ; [len, ptr2, ptr1, byte]
+  rol                   ; [len, ptr2, byte, ptr1]
+  rol3                  ; [len, ptr1, byte, ptr2]
+  dup                   ; [len, ptr1, byte, ptr2, ptr2]
+  deref8                ; [len, ptr1, byte, ptr2, byte2]
+  rol                   ; [len, ptr1, byte, byte2, ptr2]
+  rol3                  ; [len, ptr1, ptr2, byte2, byte]
+  equ                   ; [len, ptr1, ptr2, bool]
+  jumpf   memcmp_not_equ
+  
+  inc
+  rol                   ; [len, ptr2, ptr1]
+  inc
+  rol3                  ; [ptr1, ptr2, len]
+  dec
+
+  jump    memcmp
+memcmp_not_equ:
+  pop
+  pop
+  pop
+  push    1
+  ret
+memcmp_end:
+  pop
+  pop
+  pop
+  push    0
+  ret
+
+
+;
+memset:   ; [ptr, len, value]
+  rol                   ; [ptr, value, len]
+  dup
+  equ     0
+  jumpt   memset_end
+
+  dec                   ; [ptr, value, len]
+  rol3                  ; [len, value, ptr]
+  dup                   ; [len, value, ptr, ptr]
+  rol3                  ; [len, ptr, ptr, value]
+  dup                   ; [len, ptr, ptr, value, value]
+  rol3                  ; [len, ptr, value, value, ptr]
+  rol                   ; [len, ptr, value, ptr, value]
+  store8                ; [len, ptr, value]
+
+  rol                   ; [len, value, ptr]
+  inc                   ; [len, value, ptr]
+  rol3                  ; [ptr, value, len]
+  rol                   ; [ptr, len, value]
+
+  jump    memset
+memset_end:
+  ret
+
+
+;
+strlen:   ; [strptr]
+  dup
+strlen_loop:
+  dup
+  deref8
+  equ     0
+  jumpt   strlen_end
+  inc
+  jump    strlen_loop
+strlen_end:
+  rol
+  sub
+  ret
+
+
+;
+strcpy:    ; [dest, src]
+  dup                   ; [dest, src, src]
+  deref8                ; [dest, src, ch]
+  equ     0             ; [dest, src, bool]
+  jumpt   strcpy_end    ; [dest, src]
+
+  dup                   ; [dest, src, src]
+  deref8                ; [dest, src, ch]
+  rol                   ; [dest, ch, src]
+  rol3                  ; [src, ch, dest]
+  dup                   ; [src, ch, dest, dest]
+  rol3                  ; [src, dest, dest, ch]
+  store8                ; [src, dest]
+
+  inc                   ; [src, dest]
+  rol                   ; [dest, src]
+  inc                   ; [dest, src]
+
+  jump    strcpy
+strcpy_end:
+  pop
+  pop
+  ret
+
+
+;
+strcmp:
+  ret

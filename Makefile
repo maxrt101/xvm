@@ -1,3 +1,4 @@
+# xvm
 
 export TOPDIR   := $(shell pwd)
 export PREFIX   := $(TOPDIR)/build
@@ -17,7 +18,9 @@ SRC 		:=  src/main.cc \
 				src/assembler.cc \
 				src/utils.cc \
 				src/bus.cc \
-				src/devices/ram.cc
+				src/devices/ram.cc \
+				src/syscalls/io.cc \
+				src/syscalls/breakpoint.cc
 
 ifeq ("$(DEBUG)","1")
 CXXFLAGS += -g3 -D_DEBUG

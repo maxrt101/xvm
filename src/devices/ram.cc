@@ -3,7 +3,7 @@
 #include <cstdio>
 
 xvm::bus::device::RAM::RAM(size_t size, size_t base) : m_size(size), m_baseAddr(base) {
-  m_buffer = new uint8_t[size];
+  m_buffer = new uint8_t[size] {0};
 }
 
 xvm::bus::device::RAM::~RAM() {

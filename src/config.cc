@@ -84,6 +84,19 @@ void xvm::config::setFromString(const std::string& name, const std::string& valu
   }
 }
 
+std::string xvm::config::getAsString(const std::string& name) {
+  if (!exists(name)) return "";
+  switch (getType(name)) {
+    case Type::NONE:    return "";
+    case Type::STRING:  return getString(name);
+    case Type::INT:     return std::to_string(getInt(name));
+    case Type::FLOAT:   return std::to_string(getInt(name));
+    case Type::BOOL:    return getBool(name) ? "true" : "false";
+    case Type::VOIDPTR: return std::to_string((unsigned long long)getVoidPtr(name));
+  }
+  return "";
+}
+
 std::string xvm::config::getString(const std::string& name) {
   if (exists(name)) {
     return g_config[name].m_value->as<StringValue>()->m_data;
