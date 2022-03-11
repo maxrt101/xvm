@@ -27,6 +27,7 @@ push          VALUE         IMM           Pushes value onto stack
 pop           [COUNT]       IMM           Pops COUNT values from stack (defalt 1)
 dup                         IMM           Dups top value
 rol                         IMM           Rolls 2 top values
+rol3                        IMM           Rolls 3 top values
 deref8        [ADDR]        IMM     STK   Dereferences an address (pointer to byte)
 deref16       [ADDR]        IMM     STK   Dereferences an address (pointer to short)
 deref32       [ADDR]        IMM     STK   Dereferences an address (pointer to int)

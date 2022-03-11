@@ -83,6 +83,7 @@ void xvm::sys_open(VM* vm) {
 
   std::string filename = utils::busReadString(vm, fileptr);
 
+  // std::filesystem::exists
   /*if (isFileExists(filename)) {
     vm->getStack().push(-1);
     debug("File '%s' doesn't exist", filename.c_str());

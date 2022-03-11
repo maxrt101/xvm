@@ -36,6 +36,10 @@ void xvm::sys_breakpoint(VM* vm) {
           printf("Usage: jump ADDR");
         } else if (tokens[1] == "call") {
           printf("Usage: call ADDR");
+        } else if (tokens[1] == "getopt") {
+          printf("Usage: getopt NAME\n");
+        } else if (tokens[1] == "setopt") {
+          printf("Usage: setopt NAME VALUE\n");
         } else if (tokens[1] == "print") {
           printf("Usage: print stack");
           printf("Usage: print ram ADDR LEN");
@@ -69,7 +73,7 @@ void xvm::sys_breakpoint(VM* vm) {
         continue;
       }
       vm->call(utils::getInt(tokens[1]));
-    } else if (tokens[0] == "reset") {
+    } else if (tokens[0] == "reset" || tokens[0] == "r") {
       vm->reset();
     } else if (tokens[0] == "set" || tokens[0] == "s") {
       std::string type = "i8";

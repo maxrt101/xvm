@@ -59,7 +59,7 @@ struct LabelMention {
 };
 
 struct Label {
-  int32_t address = 0;
+  int32_t address = -1;
   std::vector<LabelMention> mentions;
 };
 

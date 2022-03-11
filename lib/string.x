@@ -92,11 +92,14 @@ memset:   ; [ptr, len, value]
 
   jump    memset
 memset_end:
+  pop
+  pop
+  pop
   ret
 
 
 ;
-strlen:   ; [strptr]
+strlen:   ; [str] -> [len]
   dup
 strlen_loop:
   dup
@@ -140,3 +143,10 @@ strcpy_end:
 ;
 strcmp:
   ret
+
+
+;
+stoi:     ; [str]
+  ;
+  ret
+

@@ -84,6 +84,7 @@ int xvm::Assembler::assemble(Executable& exe) {
   if (m_hadError) return -1;
 
   patchLabels();
+  if (m_hadError) return -1;
 
   exe.magic = XVM_MAGIC;
   exe.version = XVM_VERSION_CODE;
@@ -256,7 +257,7 @@ xvm::Token xvm::Assembler::character() {
 xvm::Token xvm::Assembler::number() {
   m_start = m_current;
   skipWhitespace();
-  while (isdigit(*m_current) || *m_current == 'x' || *m_current == 'b' || (*m_current >= 'a' && *m_current <= 'f')) m_current++;
+  while (isdigit(*m_current) || *m_current == 'x' || (*m_current >= 'a' && *m_current <= 'f')) m_current++;
   std::string str(m_start, m_current - m_start);
   if (str.find('x') != std::string::npos || str.find('b') != std::string::npos) {
     if (str[0] != '0') {
@@ -450,6 +451,10 @@ int32_t xvm::Assembler::getAddress() {
 void xvm::Assembler::patchLabels() { // TODO: check for unpatched labels
   for (auto& label : m_labels) {
     for (auto mention : label.second.mentions) {
+      if (label.second.address == -1) {
+        error("Unknown label: %s", label.first.c_str());
+        m_hadError = true;
+      }
       abi::N32 value;
       value.i32 = label.second.address;
       m_code[mention.address]   += value.u8[0];
