@@ -24,9 +24,7 @@ memcpy:   ; [dest, src, len]
 
   jump    memcpy
 memcpy_end:
-  pop
-  pop
-  pop
+  pop     3
   ret
 
 
@@ -56,15 +54,11 @@ memcmp:   ; [ptr1, ptr2, len]
 
   jump    memcmp
 memcmp_not_equ:
-  pop
-  pop
-  pop
+  pop     3
   push    1
   ret
 memcmp_end:
-  pop
-  pop
-  pop
+  pop     3
   push    0
   ret
 
@@ -92,9 +86,7 @@ memset:   ; [ptr, len, value]
 
   jump    memset
 memset_end:
-  pop
-  pop
-  pop
+  pop     3
   ret
 
 
@@ -135,8 +127,7 @@ strcpy:    ; [dest, src]
 
   jump    strcpy
 strcpy_end:
-  pop
-  pop
+  pop     2
   ret
 
 

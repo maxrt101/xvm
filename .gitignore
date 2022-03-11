@@ -31,9 +31,14 @@
 *.out
 *.app
 
+# Editors
 .vscode
-.DS_Store
 .*.sw*
 
+# MacOS
+.DS_Store
+
+# Project Specific
 build/
+*.xbin
 

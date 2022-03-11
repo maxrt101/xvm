@@ -476,7 +476,12 @@ void xvm::Assembler::parse() {
         pushOpcode(IMM1, PUSH);
         pushInt32(getAddress());
       } else if (m_tokens[m_index] == "pop") {
-        pushOpcode(STK, POP);
+        if (isNextTokenOnSameLine()) {
+          pushOpcode(IMM1, POP);
+          pushInt32(getAddress());
+        } else {
+          pushOpcode(STK, POP);
+        }
       } else if (m_tokens[m_index] == "dup") {
         pushOpcode(STK, DUP);
       } else if (m_tokens[m_index] == "rol") {

@@ -20,10 +20,10 @@ void xvm::VM::loadRegion(size_t address, const uint8_t* data, size_t length) {
 
 void xvm::VM::printRegion(size_t start, size_t length) {
   int printCols = 16;
-  int canPrint = 1;
+  bool canPrint = true;
   char buf[16];
-  int count = start;
-  int end = start + length;
+  size_t count = start;
+  size_t end = start + length;
 
   while (canPrint) {
     if (count >= end) break;
@@ -33,19 +33,14 @@ void xvm::VM::printRegion(size_t start, size_t length) {
     printf("0x%04x |", count);
 
     for (int i = 0; i < printCols; i++) {
-      if (i % (printCols/2) == 0) {
-        printf("  ");
-      } else {
-        printf(" ");
-      }
+      printf("%s", (i % (printCols/2) == 0) ? "  " : " ");
 
       if (count < end) {
         printf("%02x", (unsigned char)m_bus.read(count));
-        buf[count % printCols] = m_bus.read(count);
-        count++;
+        buf[count % printCols] = m_bus.read(count++);
       } else {
         printf("  ");
-        canPrint = 0;
+        canPrint = false;
       }
     }
 
@@ -143,7 +138,15 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
       break;
     }
     case POP: {
-      m_stack.pop();
+      N32 count;
+      if (mode == IMM1 || mode == IMM2) {
+        nextInt32(count);
+      } else {
+        count.i32 = 1;
+      }
+      for (int i = 0; i < count.i32; i++) {
+        m_stack.pop();
+      }
       break;
     }
     case DUP: {

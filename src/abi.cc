@@ -18,10 +18,10 @@ void xvm::abi::readInt32(N32& result, const uint8_t* data, size_t offset) {
 
 void xvm::abi::hexdump(const uint8_t* data, size_t length) {
   int printCols = 16;
-  int canPrint = 1;
+  bool canPrint = true;
   char buf[16];
-  int count = 0;
-  int end = length;
+  size_t count = 0;
+  size_t end = length;
 
   while (canPrint) {
     if (count >= end) break;
@@ -31,19 +31,14 @@ void xvm::abi::hexdump(const uint8_t* data, size_t length) {
     printf("0x%04x |", count);
 
     for (int i = 0; i < printCols; i++) {
-      if (i % (printCols/2) == 0) {
-        printf("  ");
-      } else {
-        printf(" ");
-      }
+      printf("%s", (i % (printCols/2) == 0) ? "  " : " ");
 
       if (count < end) {
         printf("%02x", (unsigned char)data[count]);
-        buf[count % printCols] = data[count];
-        count++;
+        buf[count % printCols] = data[count++];
       } else {
         printf("  ");
-        canPrint = 0;
+        canPrint = false;
       }
     }
 
