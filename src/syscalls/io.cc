@@ -10,13 +10,6 @@
 #include <unistd.h>
 #include <termios.h>
 
-/* non blocking read
-int flags = fcntl(STDIN_FILENO, F_GETFL);
-fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
-read(STDERR_FILENO, &c, 1);
-fcntl(STDIN_FILENO, F_SETFL, flags | -O_NONBLOCK);
-*/
-
 static std::unordered_map<std::string, int> g_fds;
 
 static int convertFileFlags(int flags) {

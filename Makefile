@@ -4,7 +4,7 @@ export TOPDIR   := $(shell pwd)
 export PREFIX   := $(TOPDIR)/build
 
 export CXX      := clang++
-export CXXFLAGS := -std=c++17 -I$(TOPDIR)/include -I$(PREFIX)/include
+export CXXFLAGS := -std=c++17 -I$(TOPDIR)/include -I$(PREFIX)/include -Wno-unsequenced
 
 TARGET  := $(PREFIX)/bin/xvm
 SRC     :=  src/main.cc \
@@ -23,20 +23,23 @@ SRC     :=  src/main.cc \
             src/syscalls/breakpoint.cc
 
 ifeq ("$(DEBUG)","1")
+$(info [!] Debug on)
 CXXFLAGS += -g3 -D_DEBUG
 endif
 
 .PHONY: build
 
 build: prepare
-	$(info Building $(TARGET))
+	$(info [+] Building $(TARGET))
 	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET)
 
 prepare:
+	$(info [+] Preparing folders)
 	mkdir -p $(PREFIX)
 	mkdir -p $(PREFIX)/bin
 
 clean::
-	rm -rf $(PREFIX)
+	$(info [+] Cleaning)
+	rm -rf $(TARGET)
 
 $(V).SILENT:

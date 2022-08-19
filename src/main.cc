@@ -21,19 +21,19 @@ static void printHelp(const char* argv0) {
   printVersion();
   printf("Usage: %s COMMAND [OPTIONS]\n", argv0);
   printf("Commands:\n");
-  printf("  help\n");
-  printf("  version\n");
-  printf("  compile FILE\n");
-  printf("  run FILE\n");
-  printf("  runsrc FILE\n");
-  printf("  disasm FILE\n");
+  printf("  help          - Shows this message\n");
+  printf("  version       - Shows version\n");
+  printf("  compile FILE  - Compiles FILE, output binary can be specified with -o\n");
+  printf("  run FILE      - Runs compiled file\n");
+  printf("  runsrc FILE   - Runs source file direclty (without saving binary)\n");
+  printf("  disasm FILE   - Disassembles compiled file\n");
   printf("Options:\n");
-  printf("  -s, --setopt OPTION=VALUE\n");
-  printf("  -o, --output FILE\n");
-  printf("  -i, --include FOLDER\n");
-  printf("  -r, --raw\n");
-  printf("  -d, --debug\n");
-  printf("  -v, --verbose\n");
+  printf("  -s, --setopt OPTION=VALUE - Sets option\n");
+  printf("  -o, --output FILE         - Sets output file\n");
+  printf("  -i, --include FOLDER      - Adds include folder\n");
+  printf("  -r, --raw                 - Outputs raw compiled code\n");
+  printf("  -d, --debug               - Turns on debug flag\n");
+  printf("  -v, --verbose             - Turns on verbose flag\n");
 }
 
 static int compile(const std::string& filename, const std::string& output, std::vector<std::string>& includes) {
@@ -221,7 +221,7 @@ int main(int argc, char ** argv) {
   if (command == "") {
     xvm::error("No command supplied, type '%s help' to get help", argv[0]);
     return -1;
-  } else if (command == "help") {
+  } else if (command == "help" || command == "-h" || command == "--help") {
     printHelp(argv[0]);
   } else if (command == "version") {
     printVersion();

@@ -30,7 +30,7 @@ void xvm::VM::printRegion(size_t start, size_t length) {
 
     memset(&buf, '.', printCols);
 
-    printf("0x%04x |", count);
+    printf("0x%04zx |", count);
 
     for (int i = 0; i < printCols; i++) {
       printf("%s", (i % (printCols/2) == 0) ? "  " : " ");
@@ -111,7 +111,7 @@ void xvm::VM::run() {
   while (m_running && m_ip < m_bus.max()) {
     uint8_t byte = next();
     if (config::getBool("debug")) {
-      abi::disassembleInstruction(m_ram.getBuffer(), m_ip-1); // works as shit
+      abi::disassembleInstruction(m_ram.getBuffer(), m_ip-1);
     }
     m_running = executeInstruction(abi::extractMode(byte), abi::extractOpcode(byte));
   }

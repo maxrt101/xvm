@@ -28,7 +28,7 @@ void xvm::abi::hexdump(const uint8_t* data, size_t length) {
 
     memset(&buf, '.', printCols);
 
-    printf("0x%04x |", count);
+    printf("0x%04zx |", count);
 
     for (int i = 0; i < printCols; i++) {
       printf("%s", (i % (printCols/2) == 0) ? "  " : " ");
