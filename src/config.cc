@@ -1,5 +1,5 @@
-#include "config.h"
-#include "version.h"
+#include <xvm/config.h>
+#include <xvm/version.h>
 
 #include <memory>
 #include <vector>

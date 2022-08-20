@@ -1,6 +1,6 @@
-#include "syscalls.h"
-#include "devices/ram.h"
-#include "utils.h"
+#include <xvm/syscalls.h>
+#include <xvm/devices/ram.h>
+#include <xvm/utils.h>
 
 std::string xvm::utils::busReadString(xvm::VM* vm, int32_t ptr) {
   std::string str;
@@ -35,8 +35,10 @@ void xvm::registerSyscalls(VM* vm) {
   vm->registerSyscall(VMX_SYSCALL_CLOSE,      "close",      sys_close);
   vm->registerSyscall(VMX_SYSCALL_READ,       "read",       sys_read);
   vm->registerSyscall(VMX_SYSCALL_WRITE,      "write",      sys_write);
+  vm->registerSyscall(VMX_SYSCALL_SLEEP,      "sleep",      sys_sleep);
   vm->registerSyscall(VMX_SYSCALL_FSCTL,      "fsctl",      [](VM* vm) {});
   vm->registerSyscall(VMX_SYSCALL_VMCTL,      "vmctl",      [](VM* vm) {});
   vm->registerSyscall(VMX_SYSCALL_SYSCTL,     "sysctl",     [](VM* vm) {});
   vm->registerSyscall(VMX_SYSCALL_BREAKPOINT, "breakpoint", sys_breakpoint);
+  vm->registerSyscall(VMX_SYSCALL_INIT_VIDEO, "init_video", sys_init_video);
 }

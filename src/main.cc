@@ -1,11 +1,11 @@
-#include "vm.h"
-#include "abi.h"
-#include "log.h"
-#include "utils.h"
-#include "config.h"
-#include "binary.h"
-#include "version.h"
-#include "assembler.h"
+#include <xvm/vm.h>
+#include <xvm/abi.h>
+#include <xvm/log.h>
+#include <xvm/utils.h>
+#include <xvm/config.h>
+#include <xvm/binary.h>
+#include <xvm/version.h>
+#include <xvm/assembler.h>
 
 #include <iostream>
 #include <fstream>

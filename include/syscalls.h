@@ -1,7 +1,7 @@
 #ifndef _XVM_SYSCALLS_H_
 #define _XVM_SYSCALLS_H_ 1
 
-#include "vm.h"
+#include <xvm/vm.h>
 
 #define VMX_SYSCALL_PUTC            20    // [char] -> []
 #define VMX_SYSCALL_READC           21    // [] -> [char]
@@ -10,10 +10,12 @@
 #define VMX_SYSCALL_CLOSE           31    // [handle] -> []
 #define VMX_SYSCALL_READ            32    // [handle, buf, len] -> []
 #define VMX_SYSCALL_WRITE           33    // [handle, buf, len] -> []
+#define VMX_SYSCALL_SLEEP           50    // [ms] -> []
 #define VMX_SYSCALL_FSCTL           60    // [..., cmd] -> [...]
 #define VMX_SYSCALL_VMCTL           70    // [..., cmd] -> [...]
 #define VMX_SYSCALL_SYSCTL          80    // [..., cmd] -> [...]
 #define VMX_SYSCALL_BREAKPOINT      90    // [] -> []
+#define VMX_SYSCALL_INIT_VIDEO      100   // [width, heigth, mem] -> []
 
 #define VMX_SYSCALL_FS_CLOSE_ALL    0
 #define VMX_SYSCALL_FS_CREATE_FILE  1
@@ -49,7 +51,11 @@ void sys_close(VM*);
 void sys_read(VM*);
 void sys_write(VM*);
 
+void sys_sleep(VM*);
+
 void sys_breakpoint(VM*);
+
+void sys_init_video(VM*);
 
 namespace utils {
 std::string busReadString(xvm::VM* vm, int32_t ptr);

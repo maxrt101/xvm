@@ -41,6 +41,8 @@ void info(const std::string format, ...);
 void warning(const std::string format, ...);
 void error(const std::string format, ...);
 void fatal(const std::string format, ...);
+void sdlError(std::string format, ...);
+void sdlFatal(std::string format, ...);
 
 } /* namespace xvm */
 

@@ -1,8 +1,12 @@
-#include "bus.h"
+#include <xvm/bus.h>
 
-xvm::bus::Device::Device() {}
+xvm::bus::Device::Device(const std::string& name) : m_name(name) {}
 
 xvm::bus::Device::~Device() {}
+
+std::string xvm::bus::Device::getName() const {
+  return m_name;
+}
 
 xvm::bus::Bus::Dev::~Dev() {
   if (destroy) {
@@ -55,6 +59,15 @@ xvm::bus::Device* xvm::bus::Bus::getDevice(size_t index) const {
 xvm::bus::Device* xvm::bus::Bus::getDeviceByAddress(size_t address) const {
   for (auto& dev : m_devices) {
     if (dev.check(address)) {
+      return dev.device;
+    }
+  }
+  return nullptr;
+}
+
+xvm::bus::Device* xvm::bus::Bus::getDeviceByName(const std::string& name) const {
+  for (auto& dev : m_devices) {
+    if (dev.device->getName() == name) {
       return dev.device;
     }
   }

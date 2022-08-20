@@ -1,7 +1,7 @@
-#include "binary.h"
-#include "config.h"
-#include "log.h"
-#include "abi.h"
+#include <xvm/binary.h>
+#include <xvm/config.h>
+#include <xvm/log.h>
+#include <xvm/abi.h>
 
 #include <cstdio>
 #include <errno.h>

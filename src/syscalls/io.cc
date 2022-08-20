@@ -1,5 +1,5 @@
-#include "syscalls.h"
-#include "log.h"
+#include <xvm/syscalls.h>
+#include <xvm/log.h>
 
 #include <unordered_map>
 #include <iostream>

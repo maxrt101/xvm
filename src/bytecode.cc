@@ -1,5 +1,5 @@
-#include "bytecode.h"
-#include "abi.h"
+#include <xvm/bytecode.h>
+#include <xvm/abi.h>
 
 std::string xvm::abi::addressingModeToString(AddressingMode mode) {
   switch (mode) {

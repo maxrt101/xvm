@@ -1,7 +1,9 @@
 #ifndef _XVM_DEVICES_RAM_H_
 #define _XVM_DEVICES_RAM_H_ 1
 
-#include "bus.h"
+#include <xvm/bus.h>
+
+#define XVM_BUS_DEV_RAM_NAME "ram"
 
 namespace xvm {
 namespace bus {

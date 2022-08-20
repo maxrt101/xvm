@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <string>
-#include "abi.h"
+#include <xvm/abi.h>
 
 
 namespace xvm {

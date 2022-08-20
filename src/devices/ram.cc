@@ -1,8 +1,8 @@
-#include "devices/ram.h"
+#include <xvm/devices/ram.h>
 
 #include <cstdio>
 
-xvm::bus::device::RAM::RAM(size_t size, size_t base) : m_size(size), m_baseAddr(base) {
+xvm::bus::device::RAM::RAM(size_t size, size_t base) : Device(XVM_BUS_DEV_RAM_NAME), m_size(size), m_baseAddr(base) {
   m_buffer = new uint8_t[size] {0};
 }
 

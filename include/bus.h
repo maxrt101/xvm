@@ -2,14 +2,20 @@
 #define _XVM_BUS_H_ 1
 
 #include <vector>
+#include <string>
 
 namespace xvm {
 namespace bus {
 
 class Device {
+ private:
+  std::string m_name;
+
  public:
-  Device();
+  Device(const std::string& name);
   virtual ~Device();
+
+  std::string getName() const;
 
   virtual uint8_t read(size_t address) = 0;
   virtual void write(size_t address, uint8_t value) = 0;
@@ -43,6 +49,7 @@ class Bus {
 
   Device* getDevice(size_t index) const;
   Device* getDeviceByAddress(size_t address) const;
+  Device* getDeviceByName(const std::string& name) const;
 
   size_t min() const;
   size_t max() const;

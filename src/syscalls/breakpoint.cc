@@ -1,9 +1,9 @@
-#include "syscalls.h"
-#include "devices/ram.h"
-#include "config.h"
-#include "utils.h"
-#include "log.h"
-#include "abi.h"
+#include <xvm/syscalls.h>
+#include <xvm/devices/ram.h>
+#include <xvm/config.h>
+#include <xvm/utils.h>
+#include <xvm/log.h>
+#include <xvm/abi.h>
 
 #include <iostream>
 #include <string>

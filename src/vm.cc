@@ -1,9 +1,9 @@
-#include "vm.h"
-#include "abi.h"
-#include "log.h"
-#include "config.h"
-#include "syscalls.h"
-#include "devices/ram.h"
+#include <xvm/vm.h>
+#include <xvm/abi.h>
+#include <xvm/log.h>
+#include <xvm/config.h>
+#include <xvm/syscalls.h>
+#include <xvm/devices/ram.h>
 
 xvm::VM::VM(size_t ramSize) : m_ram(ramSize, 0) {
   m_bus.bind(0, ramSize, &m_ram, false);

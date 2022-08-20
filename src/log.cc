@@ -1,4 +1,6 @@
-#include "log.h"
+#include <xvm/log.h>
+
+#include <SDL2/SDL.h>
 
 #define _VLOGF_INTERNAL(level) \
   va_list args; \
@@ -71,5 +73,19 @@ void xvm::error(const std::string format, ...) {
 }
 
 void xvm::fatal(const std::string format, ...) {
+  _VLOGF_INTERNAL(LogLevel::FATAL);
+}
+
+void xvm::sdlError(std::string format, ...) {
+  format += " (";
+  format += SDL_GetError();
+  format += ")";
+  _VLOGF_INTERNAL(LogLevel::ERROR);
+}
+
+void xvm::sdlFatal(std::string format, ...) {
+  format += " (";
+  format += SDL_GetError();
+  format += ")";
   _VLOGF_INTERNAL(LogLevel::FATAL);
 }

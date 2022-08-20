@@ -15,8 +15,12 @@
 %syscall read       32
 %syscall write      33
 
+%syscall sleep      50
+
 %syscall fsctl      60
 %syscall vmctl      60
 %syscall sysctl     70
 
 %syscall breakpoint 90
+
+%syscall init_video 100

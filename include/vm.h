@@ -1,21 +1,23 @@
 #ifndef _XVM_VM_H_
 #define _XVM_VM_H_ 1
 
-#include <cstdint>
-
-#include "devices/ram.h"
-#include "bytecode.h"
-#include "stack.h"
-#include "bus.h"
-#include "abi.h"
+#include <xvm/abi.h>
+#include <xvm/bus.h>
+#include <xvm/stack.h>
+#include <xvm/bytecode.h>
+#include <xvm/devices/ram.h>
+#include <xvm/devices/video.h>
 
 #include <unordered_map>
 #include <functional>
+#include <cstdint>
 #include <string>
 
 namespace xvm {
 
 class VM {
+  friend void sys_init_video(VM*);
+
  public:
   using StackType = int32_t;
   using CallStackType = uint32_t;
@@ -29,6 +31,7 @@ class VM {
  private:
   bus::Bus m_bus;
   bus::device::RAM m_ram;
+  bus::device::Video m_video;
   size_t m_ip = 0;
 
   Stack<StackType> m_stack;

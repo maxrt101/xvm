@@ -1,0 +1,72 @@
+
+%define VIDEO_STATUS_REG_OFFSET   0
+%define VIDEO_STATE_REG_OFFSET    1
+%define VIDEO_MODE_REG_OFFSET     2
+%define VIDEO_CMD_REG_OFFSET      3
+%define VIDEO_UPDATE_REG_OFFSET   4
+%define VIDEO_R_REG_OFFSET        5
+%define VIDEO_G_REG_OFFSET        6
+%define VIDEO_B_REG_OFFSET        7
+%define VIDEO_A_REG_OFFSET        8
+%define VIDEO_MEM_OFFSET          256
+
+%def i32 WIDTH  640
+%def i32 HEIGTH 480
+%def i32 VMEM   10000
+
+
+video_init:             ; [width, height, baseAddr]
+  load32  WIDTH
+  load32  HEIGTH
+  load32  VMEM
+  syscall init_video    ; init video
+  load32  VMEM
+  add     VIDEO_MODE_REG_OFFSET
+  push    1
+  store8                ; set mode
+  ret
+
+
+video_set_rgba:         ; [r, g, b, a]
+
+  load32  VMEM
+  add     VIDEO_A_REG_OFFSET
+  rol
+  store8
+
+  load32  VMEM
+  add     VIDEO_B_REG_OFFSET
+  rol
+  store8
+
+  load32  VMEM
+  add     VIDEO_G_REG_OFFSET
+  rol
+  store8
+
+  load32  VMEM
+  add     VIDEO_R_REG_OFFSET
+  rol
+  store8
+
+  ret
+
+
+video_set_pixel_at:     ; [x, y]
+  load32  WIDTH
+  mul
+  add
+  load32  VMEM
+  add
+  add     VIDEO_MEM_OFFSET
+  push    1
+  store8
+  ret
+
+
+video_update:
+  load32  VMEM
+  add     VIDEO_UPDATE_REG_OFFSET
+  push    1
+  store8
+  ret

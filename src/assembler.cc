@@ -1,8 +1,8 @@
-#include "assembler.h"
-#include "version.h"
-#include "utils.h"
-#include "log.h"
-#include "abi.h"
+#include <xvm/assembler.h>
+#include <xvm/version.h>
+#include <xvm/utils.h>
+#include <xvm/log.h>
+#include <xvm/abi.h>
 
 #include <algorithm>
 #include <iostream>
@@ -306,12 +306,12 @@ xvm::Token xvm::Assembler::string() {
 
 xvm::Token xvm::Assembler::getNextToken() {
   if (m_tokens[m_index+1].type == TokenType::IDENTIFIER) {
-    auto itr = m_defines.find(m_tokens[m_index+1].str);
-    if (itr != m_defines.end()) {
+    if (isDefined(m_tokens[m_index+1].str)) {
       int line = m_tokens[m_index].line;
+      auto defined = getDefined(m_tokens[m_index+1].str);
       m_tokens.erase(m_tokens.begin() + m_index + 1);
-      m_tokens.insert(m_tokens.begin() + m_index + 1, itr->second.begin(), itr->second.end());
-      for (int i = 0; i < itr->second.size(); i++) { // Change line in replaced tokens
+      m_tokens.insert(m_tokens.begin() + m_index + 1, defined.begin(), defined.end());
+      for (int i = 0; i < defined.size(); i++) { // Change line in replaced tokens
         m_tokens[m_index + i + 1].line = line;
       }
     }

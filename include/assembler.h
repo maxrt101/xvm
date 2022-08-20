@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "bytecode.h"
-#include "binary.h"
+#include <xvm/bytecode.h>
+#include <xvm/binary.h>
 
 namespace xvm {
 
