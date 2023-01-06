@@ -36,7 +36,7 @@ static void printHelp(const char* argv0) {
 static int compile(const std::string& filename, const std::string& output, std::vector<std::string>& includes) {
   if (!xvm::isFileExists(filename)) {
     xvm::error("File not exists: '%s'", filename.c_str());
-    return -1;
+    return 1;
   }
 
   std::ifstream sourceFile(filename);
@@ -46,10 +46,9 @@ static int compile(const std::string& filename, const std::string& output, std::
   assembler.setIncludeFolders(includes);
 
   xvm::Executable exe;
-  int ret = assembler.assemble(exe, xvm::config::getBool("include-symbols"));
-  if (ret) {
-    xvm::error("Error assembling '%s'", filename.c_str());
-    return -1;
+  if (int ret = assembler.assemble(exe, xvm::config::getBool("include-symbols"))) {
+    xvm::error("Error assembling '%s' (ret=%d)", filename.c_str(), ret);
+    return 1;
   }
 
   if (!exe.hasSection("code")) {
@@ -59,25 +58,29 @@ static int compile(const std::string& filename, const std::string& output, std::
 
   auto& code = exe.getSection("code");
 
-  if (xvm::config::getBool("hexdump")) {
-    xvm::abi::hexdump(code.data.data(), code.data.size());
+  if (xvm::config::getBool("disasm")) {
+    printf("=== Disassembly ===\n");
+    // for (int i = 0; i < code.data.size(); ) {
+    //   i = xvm::abi::disassembleInstruction(code.data.data(), i);
+    // }
+    exe.disassemble();
   }
 
-  if (xvm::config::getBool("disasm")) {
-    printf("=== disassembly ===\n");
-    for (int i = 0; i < code.data.size(); ) {
-      i = xvm::abi::disassembleInstruction(code.data.data(), i);
-    }
+  if (xvm::config::getBool("hexdump")) {
+    printf("=== Hexdump ===\n");
+    auto bytes = exe.toBytes();
+    xvm::abi::hexdump(bytes.data(), bytes.size());
   }
 
   exe.toFile(output);
+
   return 0;
 }
 
 static int run(const std::string& filename) {
   if (!xvm::isFileExists(filename)) {
     xvm::error("File not exists: '%s'", filename.c_str());
-    return -1;
+    return 1;
   }
 
   xvm::Executable exe = xvm::Executable::fromFile(filename);
@@ -95,22 +98,28 @@ static int run(const std::string& filename) {
   auto& code = exe.getSection("code");
 
   if (xvm::config::getBool("hexdump")) {
-    xvm::abi::hexdump(code.data.data(), code.data.size());
+    printf("=== Hexdump ===\n");
+    auto bytes = exe.toBytes();
+    xvm::abi::hexdump(bytes.data(), bytes.size());
   }
 
   if (xvm::config::getBool("disasm")) {
-    printf("=== disassembly ===\n");
-    for (int i = 0; i < code.data.size(); ) {
-      i = xvm::abi::disassembleInstruction(code.data.data(), i);
-    }
+    printf("=== Disassembly ===\n");
+    // for (int i = 0; i < code.data.size(); ) {
+    //   i = xvm::abi::disassembleInstruction(code.data.data(), i);
+    // }
+    exe.disassemble();
   }
 
   xvm::VM vm(xvm::config::getInt("ram_size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
-  if (xvm::config::getBool("disasm")) {
-    printf("=== execution ===\n");
+
+  if (xvm::config::getInt("debug") > 0) {
+    printf("=== Execution Traces ===\n");
   }
+
   vm.run();
+
   return 0;
 }
 
@@ -127,9 +136,8 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
   assembler.setIncludeFolders(includes);
 
   xvm::Executable exe;
-  int ret = assembler.assemble(exe);
-  if (ret) {
-    xvm::error("Error assembling '%s'", filename.c_str());
+  if (int ret = assembler.assemble(exe)) {
+    xvm::error("Error assembling '%s' (ret=%d)", filename.c_str(), ret);
     return -1;
   }
 
@@ -141,11 +149,13 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
   auto& code = exe.getSection("code");
 
   if (xvm::config::getBool("hexdump")) {
-    xvm::abi::hexdump(code.data.data(), code.data.size());
+    printf("=== Hexdump ===\n");
+    auto bytes = exe.toBytes();
+    xvm::abi::hexdump(bytes.data(), bytes.size());
   }
 
   if (xvm::config::getBool("disasm")) {
-    printf("=== disassembly ===\n");
+    printf("=== Disassembly ===\n");
     for (int i = 0; i < code.data.size(); ) {
       i = xvm::abi::disassembleInstruction(code.data.data(), i);
     }
@@ -153,10 +163,13 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
 
   xvm::VM vm(xvm::config::getInt("ram_size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
-  if (xvm::config::getBool("disasm")) {
-    printf("=== execution ===\n");
+
+  if (xvm::config::getInt("debug") > 0) {
+    printf("=== Execution Traces ===\n");
   }
+
   vm.run();
+
   return 0;
 }
 
@@ -187,43 +200,26 @@ static int dump(const std::string& filename) {
   xvm::printTable(xvm::Executable::Section::getFieldNames(), exe.sections);
 
   for (auto& section : exe.sections) {
-    // printf("+");
-    // for (int i = 0; i < (section.label.size() + 8); i++) printf("-");
-    // printf("+\n");
-    // xvm::printTableBorder({section.label.size() + 7});
-
     printf("\nSection '%s'\n", section.label.c_str());
 
-    /*printf(
-      "\n"
-      "Section:  %s\n"
-      "Type:     0x%x\n"
-      "Checksum: 0x%x\n",
-      section.label.c_str(),
-      section.type,
-      section.checksum
-    );*/
-
-    /*if (xvm::config::getBool("hexdump")) {
-      printf("=== dump ===\n");
-      xvm::abi::hexdump(section.data.data(), section.data.size());
-    }*/
+    if (xvm::config::getBool("hexdump")) {
+      // printf("=== Hexdump ===\n");
+      auto bytes = section.toBytes();
+      xvm::abi::hexdump(bytes.data(), bytes.size());
+    }
 
     if (section.type == xvm::SectionType::CODE) {
-      // printf("=== disassembly ===\n");
-      for (int i = 0; i < section.data.size(); ) {
-        i = xvm::abi::disassembleInstruction(section.data.data(), i);
-      }
+      exe.disassemble();
     }
 
     if (section.type == xvm::SectionType::SYMBOLS) {
       auto table = xvm::Executable::SymbolTable::fromSection(section);
-
-      // printf("=== symbols ===\n");
       xvm::printTable(xvm::Executable::SymbolTable::Symbol::getFieldNames(), table.symbols);
     }
 
-    // printf("\n");
+    if (section.type == xvm::SectionType::DATA) {
+      xvm::abi::hexdump(section.data.data(), section.data.size());
+    }
   }
 
   return 0;
@@ -282,7 +278,7 @@ int main(int argc, char ** argv) {
   } else if (command == "compile") {
     return compile(inputFilename, outputFilename, includeFolders);
   } else if (command == "run") {
-    run(inputFilename);
+    return run(inputFilename);
   } else if (command == "runsrc") {
     return runSrc(inputFilename, includeFolders);
   } else if (command == "dump") {

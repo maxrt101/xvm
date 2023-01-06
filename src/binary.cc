@@ -1,16 +1,18 @@
 #include <xvm/binary.h>
+#include <xvm/bytecode.h>
 #include <xvm/config.h>
 #include <xvm/log.h>
 #include <xvm/abi.h>
 
 #include <cstdio>
+#include <cctype>
 #include <errno.h>
 
-size_t xvm::Executable::Section::size() {
+size_t xvm::Executable::Section::size() const {
   return label.size() + data.size() + 12;
 }
 
-std::vector<uint8_t> xvm::Executable::Section::toBytes() {
+std::vector<uint8_t> xvm::Executable::Section::toBytes() const {
   std::vector<uint8_t> buffer;
   abi::N32 n;
 
@@ -62,7 +64,7 @@ xvm::Executable::Section xvm::Executable::Section::fromBuffer(const uint8_t* dat
   return section;
 }
 
-std::vector<std::string> xvm::Executable::Section::getStringLine() {
+std::vector<std::string> xvm::Executable::Section::getStringLine() const {
   return {label, sectionTypeToString(type), std::to_string(data.size())};
 }
 
@@ -70,19 +72,19 @@ const std::vector<std::string> xvm::Executable::Section::getFieldNames() {
   return {"Label", "Type", "Size"};
 }
 
-bool xvm::Executable::SymbolTable::Symbol::isLabel() {
+bool xvm::Executable::SymbolTable::Symbol::isLabel() const {
   return flags & (uint16_t) SymbolFlags::LABEL;
 }
 
-bool xvm::Executable::SymbolTable::Symbol::isProcedure() {
+bool xvm::Executable::SymbolTable::Symbol::isProcedure() const {
   return flags & (uint16_t) SymbolFlags::PROCEDURE;
 }
 
-bool xvm::Executable::SymbolTable::Symbol::isVariable() {
+bool xvm::Executable::SymbolTable::Symbol::isVariable() const {
   return flags & (uint16_t) SymbolFlags::VARIABLE;
 }
 
-std::vector<std::string> xvm::Executable::SymbolTable::Symbol::getStringLine() {
+std::vector<std::string> xvm::Executable::SymbolTable::Symbol::getStringLine() const {
   char buffer[32] = {0};
   snprintf(buffer, sizeof buffer, "0x%x", address);
 
@@ -102,25 +104,43 @@ void xvm::Executable::SymbolTable::addSymbol(uint32_t address, const std::string
   symbols.push_back({address, flags, data_width, label});
 }
 
-xvm::Executable::SymbolTable::Symbol xvm::Executable::SymbolTable::getByAddress(uint32_t address) {
+xvm::Executable::SymbolTable::Symbol& xvm::Executable::SymbolTable::getByAddress(uint32_t address) {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return symbol;
     }
   }
-  return {.label = "", .address = 0};
+  throw "No such symbol";
 }
 
-xvm::Executable::SymbolTable::Symbol xvm::Executable::SymbolTable::getByLabel(const std::string& label) {
+xvm::Executable::SymbolTable::Symbol& xvm::Executable::SymbolTable::getByLabel(const std::string& label) {
   for (auto& symbol : symbols) {
     if (symbol.label == label) {
       return symbol;
     }
   }
-  return {.label = "", .address = 0};
+  throw "No such symbol";
 }
 
-xvm::Executable::Section xvm::Executable::SymbolTable::toSection(const std::string& label) {
+bool xvm::Executable::SymbolTable::hasAddress(uint32_t address) const {
+  for (auto& symbol : symbols) {
+    if (symbol.address == address) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool xvm::Executable::SymbolTable::hasLabel(const std::string& label) const {
+  for (auto& symbol : symbols) {
+    if (symbol.label == label) {
+      return true;
+    }
+  }
+  return false;
+}
+
+xvm::Executable::Section xvm::Executable::SymbolTable::toSection(const std::string& label) const {
   Section section;
   abi::N32 n;
 
@@ -149,7 +169,7 @@ xvm::Executable::Section xvm::Executable::SymbolTable::toSection(const std::stri
   return section;
 }
 
-xvm::Executable::SymbolTable xvm::Executable::SymbolTable::fromSection(Section& section) {
+xvm::Executable::SymbolTable xvm::Executable::SymbolTable::fromSection(const Section& section) {
   SymbolTable table;
   abi::N32 n;
 
@@ -177,7 +197,7 @@ xvm::Executable::SymbolTable xvm::Executable::SymbolTable::fromSection(Section& 
   return table;
 }
 
-bool xvm::Executable::hasSection(const std::string& label) {
+bool xvm::Executable::hasSection(const std::string& label) const {
   for (auto& section : sections) {
     if (section.label == label) {
       return true;
@@ -195,7 +215,61 @@ xvm::Executable::Section& xvm::Executable::getSection(const std::string& label) 
   throw "No such section";
 }
 
-std::vector<uint8_t> xvm::Executable::toBytes() {
+const xvm::Executable::Section& xvm::Executable::getSection(const std::string& label) const {
+  for (auto& section : sections) {
+    if (section.label == label) {
+      return section;
+    }
+  }
+  throw "No such section";
+}
+
+void xvm::Executable::disassemble() const {
+  if (!hasSection("code")) return;
+
+  const auto& code = getSection("code");
+
+  bool hasSymbols = hasSection("symbols");  
+
+  SymbolTable table;
+
+  if (hasSymbols) {
+    table = SymbolTable::fromSection(getSection("symbols"));
+  }
+
+  for (int i = 0; i < code.data.size(); ) {
+    if (hasSymbols && table.hasAddress(i)) {
+      const auto& symbol = table.getByAddress(i);
+      if (!symbol.isVariable()) {
+        goto regular_disassemble;
+      }
+      // printf("0x%04x | %-8s %-4s ", offset, opCodeToString(opcode).c_str(), addressingModeToString(mode).c_str());
+      printf("0x%04x | %s | ", i, symbol.label.c_str());
+      char* buffer = new char[symbol.data_width+1] {0};
+      for (int idx = 0; idx < symbol.data_width; i++) {
+        printf("%02x ", code.data[i]);
+        buffer[idx++] = isprint(code.data[i]) ? code.data[i] : '.';
+      }
+      printf("| %s\n", buffer);
+      delete [] buffer;
+
+      // i += 1;
+      /*
+      0x005d | ret      STK
+      0x005e | push     IMM1 10
+      0x0063 | syscall  IMM1 0x14
+      0x0068 | ret      STK
+      0x0069 | halt     IMM1
+      0x006a | greet_string | 48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 21 0a 00 | Hello, World!..
+      */
+    } else {
+regular_disassemble:
+      i = xvm::abi::disassembleInstruction(code.data.data(), i);
+    }
+  }
+}
+
+std::vector<uint8_t> xvm::Executable::toBytes() const {
   std::vector<uint8_t> buffer;
   abi::N32 n;
 
@@ -224,7 +298,7 @@ std::vector<uint8_t> xvm::Executable::toBytes() {
   return buffer;
 }
 
-void xvm::Executable::toFile(const std::string& filename) {
+void xvm::Executable::toFile(const std::string& filename) const {
   FILE* file = fopen(filename.c_str(), "wb");
 
   if (!file) {

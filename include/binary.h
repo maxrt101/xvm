@@ -46,12 +46,12 @@ struct Executable {
     std::vector<uint8_t> data;
 
    public:
-    size_t size();
+    size_t size() const;
 
-    std::vector<uint8_t> toBytes();
+    std::vector<uint8_t> toBytes() const;
     static Section fromBuffer(const uint8_t* data, size_t offset);
 
-    std::vector<std::string> getStringLine();
+    std::vector<std::string> getStringLine() const;
     static const std::vector<std::string> getFieldNames();
   };
 
@@ -62,23 +62,29 @@ struct Executable {
       uint16_t data_width;
       std::string label;
 
-      bool isLabel();
-      bool isProcedure();
-      bool isVariable();
+      bool isLabel() const;
+      bool isProcedure() const;
+      bool isVariable() const;
 
-      std::vector<std::string> getStringLine();
+      std::vector<std::string> getStringLine() const;
       static const std::vector<std::string> getFieldNames();
     };
 
     std::vector<Symbol> symbols;
 
     void addSymbol(uint32_t address, const std::string& label, uint16_t flags = (uint16_t)SymbolFlags::LABEL, uint16_t data_width = 0);
-    Symbol getByAddress(uint32_t address);
-    Symbol getByLabel(const std::string& label);
 
-    Section toSection(const std::string& label = "symbols");
+    Symbol& getByAddress(uint32_t address);
+    Symbol& getByLabel(const std::string& label);
+    // Symbol& getByAddress(uint32_t address);
+    // Symbol& getByLabel(const std::string& label);
 
-    static SymbolTable fromSection(Section& section);
+    bool hasAddress(uint32_t address) const;
+    bool hasLabel(const std::string& label) const;
+
+    Section toSection(const std::string& label = "symbols") const;
+
+    static SymbolTable fromSection(const Section& section);
   };
 
   uint32_t magic = XVM_BAD_MAGIC;
@@ -87,11 +93,14 @@ struct Executable {
   std::vector<Section> sections;
 
  public:
-  bool hasSection(const std::string& label);
+  bool hasSection(const std::string& label) const;
   Section& getSection(const std::string& label);
+  const Section& getSection(const std::string& label) const;
 
-  std::vector<uint8_t> toBytes();
-  void toFile(const std::string& filename);
+  void disassemble() const;
+
+  std::vector<uint8_t> toBytes() const;
+  void toFile(const std::string& filename) const;
 
   static Executable fromBuffer(const uint8_t* data);
   static Executable fromFile(const std::string& filename);

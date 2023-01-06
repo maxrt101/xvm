@@ -122,7 +122,7 @@ int xvm::Assembler::assemble(Executable& exe, bool includeSymbols) {
           case Variable::Type::I8:  { data_width = 1; break; }
           case Variable::Type::I16: { data_width = 2; break; }
           case Variable::Type::I32: { data_width = 4; break; }
-          case Variable::Type::STR: { data_width = 0; break; }
+          case Variable::Type::STR: { data_width = m_variables[label.first].size + 1; break; }
           default:                  { data_width = 0; break; }
         }
       }
@@ -928,6 +928,7 @@ void xvm::Assembler::parse() {
           Token value = getNextToken();
           m_labels[name.str].address = m_code.size();
           Variable::Type vartype;
+          int varsize = 0;
           if (type.str == "i8") {
             vartype = Variable::Type::I8;
             pushByte(value.toNumber());
@@ -939,6 +940,7 @@ void xvm::Assembler::parse() {
             pushInt32(value.toNumber());
           } else if (type.str == "str") {
             vartype = Variable::Type::STR;
+            varsize = value.str.size();
             for (size_t i = 0; i < value.str.size(); i++) {
               pushByte(value.str[i]);
             }
@@ -950,6 +952,7 @@ void xvm::Assembler::parse() {
           m_variables[name.str].name = name.str;
           m_variables[name.str].address = m_labels[name.str].address;
           m_variables[name.str].type = vartype;
+          m_variables[name.str].size = varsize;
         } else if (m_tokens[m_index] == "syscall") {
           if (!isNextTokenOnSameLine()) {
             asmError("Expected syscall name");

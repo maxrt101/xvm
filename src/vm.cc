@@ -37,7 +37,7 @@ void xvm::VM::printRegion(size_t start, size_t length) {
 
       if (count < end) {
         printf("%02x", (unsigned char)m_bus.read(count));
-        buf[count % printCols] = m_bus.read(count++);
+        buf[(count-1) % printCols] = m_bus.read(count++);
       } else {
         printf("  ");
         canPrint = false;

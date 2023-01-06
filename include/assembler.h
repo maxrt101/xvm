@@ -67,6 +67,7 @@ struct Variable {
   std::string name;
   int32_t address = 0;
   Type type;
+  int size = 0;
   std::vector<Mention> mentions;
 
   static std::string typeToString(Type type);
