@@ -1,6 +1,9 @@
 #include <xvm/log.h>
+#include <xvm/config.h>
 
+#ifdef XVM_FEATURE_VIDEO
 #include <SDL2/SDL.h>
+#endif /* XVM_FEATURE_VIDEO */
 
 #define _VLOGF_INTERNAL(level) \
   va_list args; \
@@ -56,7 +59,19 @@ void xvm::logf(LogLevel level, const std::string format, ...) {
   va_end(args);
 }
 
+void xvm::debug(int debugLevel, const std::string format, ...) {
+  if (config::getInt("debug") < debugLevel) {
+    return;
+  }
+
+  _VLOGF_INTERNAL(LogLevel::DEBUG);
+}
+
 void xvm::debug(const std::string format, ...) {
+  if (config::getInt("debug") == 0) {
+    return;
+  }
+
   _VLOGF_INTERNAL(LogLevel::DEBUG);
 }
 
@@ -76,6 +91,7 @@ void xvm::fatal(const std::string format, ...) {
   _VLOGF_INTERNAL(LogLevel::FATAL);
 }
 
+#ifdef XVM_FEATURE_VIDEO
 void xvm::sdlError(std::string format, ...) {
   format += " (";
   format += SDL_GetError();
@@ -89,3 +105,4 @@ void xvm::sdlFatal(std::string format, ...) {
   format += ")";
   _VLOGF_INTERNAL(LogLevel::FATAL);
 }
+#endif /* XVM_FEATURE_VIDEO */

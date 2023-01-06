@@ -31,7 +31,9 @@ class VM {
  private:
   bus::Bus m_bus;
   bus::device::RAM m_ram;
+#ifdef XVM_FEATURE_VIDEO
   bus::device::Video m_video;
+#endif /* XVM_FEATURE_VIDEO */
   size_t m_ip = 0;
 
   Stack<StackType> m_stack;

@@ -21,29 +21,29 @@ void xvm::sys_breakpoint(VM* vm) {
         if (tokens[1] == "help") {
           printf("Usage: help [COMMAND]\n");
         } else if (tokens[1] == "halt") {
-          printf("Usage: halt");
+          printf("Usage: halt\n");
         } else if (tokens[1] == "continue") {
-          printf("Usage: continue");
+          printf("Usage: continue\n");
         } else if (tokens[1] == "reset") {
-          printf("Usage: reset");
+          printf("Usage: reset\n");
         } else if (tokens[1] == "push") {
           printf("Usage: push VALUE");
         } else if (tokens[1] == "pop") {
-          printf("Usage: pop");
+          printf("Usage: pop\n");
         } else if (tokens[1] == "set") {
-          printf("Usage: set [TYPE=i8] ADDR VALUE");
+          printf("Usage: set [TYPE=i8] ADDR VALUE\n");
         } else if (tokens[1] == "jump") {
-          printf("Usage: jump ADDR");
+          printf("Usage: jump ADDR\n");
         } else if (tokens[1] == "call") {
-          printf("Usage: call ADDR");
+          printf("Usage: call ADDR\n");
         } else if (tokens[1] == "getopt") {
           printf("Usage: getopt NAME\n");
         } else if (tokens[1] == "setopt") {
           printf("Usage: setopt NAME VALUE\n");
         } else if (tokens[1] == "print") {
-          printf("Usage: print stack");
-          printf("Usage: print ram ADDR LEN");
-          printf("Usage: print TYPE ADDR");
+          printf("Usage: print stack\n");
+          printf("Usage: print ram ADDR LEN\n");
+          printf("Usage: print TYPE ADDR\n");
         }
       } else {
         printf("Available commands: help halt continue reset print getopt setopt push pop set jump call\n");
@@ -55,7 +55,7 @@ void xvm::sys_breakpoint(VM* vm) {
       running = false;
     } else if (tokens[0] == "push") {
       if (tokens.size() != 2) {
-        error("Usage: 'print VALUE'");
+        error("Usage: push VALUE");
         continue;
       }
       vm->getStack().push(utils::getInt(tokens[1]));
@@ -87,7 +87,7 @@ void xvm::sys_breakpoint(VM* vm) {
         addr = utils::getInt(tokens[2]);
         value = utils::getInt(tokens[3]);
       } else {
-        error("Usage: 'set [TYPE=i8] ADDR VALUE'");
+        error("Usage: set [TYPE=i8] ADDR VALUE");
       }
       if (type == "i8") {
         vm->getBus().write(addr, value);
@@ -108,13 +108,13 @@ void xvm::sys_breakpoint(VM* vm) {
       }
     } else if (tokens[0] == "getopt") {
       if (tokens.size() != 2) {
-        error("Usage: 'getopt NAME'");
+        error("Usage: getopt NAME");
         continue;
       }
       printf("%s\n", config::getAsString(tokens[1]).c_str());
     } else if (tokens[0] == "setopt") {
       if (tokens.size() != 3) {
-        error("Usage: 'getopt NAME VALUE'");
+        error("Usage: getopt NAME VALUE");
         continue;
       }
       config::setFromString(tokens[1], tokens[2]);

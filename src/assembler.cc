@@ -1,5 +1,6 @@
 #include <xvm/assembler.h>
 #include <xvm/version.h>
+#include <xvm/config.h>
 #include <xvm/utils.h>
 #include <xvm/log.h>
 #include <xvm/abi.h>
@@ -71,12 +72,22 @@ int32_t xvm::Token::toNumber() {
   return std::stoi(base != 10 ? str.substr(2) : str, nullptr, base);
 }
 
+std::string xvm::Variable::typeToString(Type type) {
+  switch (type) {
+    case Type::I8:  return "i8";
+    case Type::I16: return "i16";
+    case Type::I32: return "i32";
+    case Type::STR: return "str";
+    default:        return "<error>";
+  }
+}
+
 xvm::Assembler::Assembler(const std::string& filename, const std::string& source) : m_filename(filename), m_source(source) {
   m_start = m_source.c_str();
   m_current = m_start;
 }
 
-int xvm::Assembler::assemble(Executable& exe) {
+int xvm::Assembler::assemble(Executable& exe, bool includeSymbols) {
   tokenize();
   if (m_hadError) return -1;
 
@@ -86,9 +97,48 @@ int xvm::Assembler::assemble(Executable& exe) {
   patchLabels();
   if (m_hadError) return -1;
 
+  patchVariables();
+  if (m_hadError) return -1;
+
   exe.magic = XVM_MAGIC;
   exe.version = XVM_VERSION_CODE;
-  exe.data = m_code;
+
+  exe.sections.push_back(Executable::Section {
+    "code",
+    SectionType::CODE,
+    0,
+    m_code
+  });
+
+  if (includeSymbols) {
+    Executable::SymbolTable table;
+
+    for (auto& label : m_labels) {
+      int data_width = 0;
+      uint16_t flags = 0;
+      if (m_variables.find(label.first) != m_variables.end()) {
+        flags |= (uint16_t) SymbolFlags::VARIABLE;
+        switch (m_variables[label.first].type) {
+          case Variable::Type::I8:  { data_width = 1; break; }
+          case Variable::Type::I16: { data_width = 2; break; }
+          case Variable::Type::I32: { data_width = 4; break; }
+          case Variable::Type::STR: { data_width = 0; break; }
+          default:                  { data_width = 0; break; }
+        }
+      }
+      table.addSymbol(
+        label.second.address,
+        label.first,
+        flags | (uint16_t)(label.second.isProcedure ? SymbolFlags::PROCEDURE : SymbolFlags::LABEL),
+        data_width
+      );
+    }
+
+    std::sort(table.symbols.begin(), table.symbols.end(),
+      [](auto& lhs, auto& rhs) { return lhs.address < rhs.address; });
+
+    exe.sections.push_back(table.toSection());
+  }
 
   return 0;
 }
@@ -365,6 +415,11 @@ void xvm::Assembler::tokenize() {
         m_current++;
         break;
       }
+      case '$': {
+        m_tokens.push_back(Token(TokenType::DOLLAR, m_start, 1, m_line));
+        m_current++;
+        break;
+      }
       case '+': {
         m_tokens.push_back(Token(TokenType::PLUS, m_start, 1, m_line));
         m_current++;
@@ -449,18 +504,68 @@ int32_t xvm::Assembler::getAddress() {
 }
 
 void xvm::Assembler::patchLabels() { // TODO: check for unpatched labels
+  using namespace abi;
+
   for (auto& label : m_labels) {
+    debug(2, "Label: '%s' at 0x%x", label.first.c_str(), label.second.address);
     for (auto mention : label.second.mentions) {
       if (label.second.address == -1) {
         error("Unknown label: %s", label.first.c_str());
         m_hadError = true;
       }
-      abi::N32 value;
+      N32 value;
       value.i32 = label.second.address;
       m_code[mention.address]   += value.u8[0];
       m_code[mention.address+1] += value.u8[1];
       m_code[mention.address+2] += value.u8[2];
       m_code[mention.address+3] += value.u8[3];
+      debug(2, "Label '%s' mention at 0x%x patched", label.first.c_str(), mention.address);
+    }
+  }
+}
+
+void xvm::Assembler::patchVariables() {
+  using namespace abi;
+
+  for (auto& var : m_variables) {
+    debug(2, "Variable: '%s' type '%s' at 0x%x", var.first.c_str(), Variable::typeToString(var.second.type).c_str(), var.second.address);
+    for (auto mention : var.second.mentions) {
+      if (var.second.address == -1) {
+        error("Unknown variable: %s", var.first.c_str());
+        m_hadError = true;
+      }
+      N32 value;
+      if (mention.isDeref) {
+        OpCode op;
+        switch (var.second.type) {
+          case Variable::Type::STR:
+          case Variable::Type::I8: {
+            op = DEREF8;
+            break;
+          }
+          case Variable::Type::I16: {
+            op = DEREF16;
+            break;
+          }
+          case Variable::Type::I32: {
+            op = DEREF32;
+            break;
+          }
+          default: {
+            asmError("Invalid var type (%d)", var.second.type);
+            return;
+          }
+        }
+        m_code[mention.address] = encodeInstruction(STK, op);
+        debug(2, "Variable '%s' deref mention at 0x%x patched with %s", var.first.c_str(), mention.address, opCodeToString(op).c_str());
+      } else {
+        value.i32 = var.second.address;
+        m_code[mention.address]   += value.u8[0];
+        m_code[mention.address+1] += value.u8[1];
+        m_code[mention.address+2] += value.u8[2];
+        m_code[mention.address+3] += value.u8[3];
+        debug(2, "Variable '%s' mention at 0x%x patched", var.first.c_str());
+      }
     }
   }
 }
@@ -474,7 +579,21 @@ void xvm::Assembler::parse() {
         pushOpcode(STK, HALT);
       } else if (m_tokens[m_index] == "push") {
         pushOpcode(IMM1, PUSH);
-        pushInt32(getAddress());
+        if (m_tokens[m_index+1].type == TokenType::DOLLAR) {
+          m_index++;
+          if (m_tokens[m_index+1].type != TokenType::IDENTIFIER) {
+            asmError(m_tokens[m_index+1], "Expected label after '$'");
+          }
+          pushInt32(getAddress());
+          auto varname = m_tokens[m_index].str;
+          if (m_variables.find(varname) == m_variables.end()) {
+            m_variables[varname] = {};
+          }
+          m_variables[varname].mentions.push_back({static_cast<int32_t>(m_code.size()), true});
+          pushOpcode(STK, NOP);
+        } else {
+          pushInt32(getAddress());
+        }
       } else if (m_tokens[m_index] == "pop") {
         if (isNextTokenOnSameLine()) {
           pushOpcode(IMM1, POP);
@@ -738,6 +857,9 @@ void xvm::Assembler::parse() {
       } else if (m_tokens[m_index] == "call") {
         if (isNextTokenOnSameLine()) {
           pushOpcode(IMM1, CALL);
+          if (m_tokens[m_index+1].type == TokenType::IDENTIFIER) {
+            m_labels[m_tokens[m_index+1].str].isProcedure = true;
+          }
           pushInt32(getAddress());
         } else {
           pushOpcode(STK, CALL);
@@ -805,13 +927,18 @@ void xvm::Assembler::parse() {
           }
           Token value = getNextToken();
           m_labels[name.str].address = m_code.size();
+          Variable::Type vartype;
           if (type.str == "i8") {
+            vartype = Variable::Type::I8;
             pushByte(value.toNumber());
           } else if (type.str == "i16") {
+            vartype = Variable::Type::I16;
             pushInt16(value.toNumber());
           } else if (type.str == "i32") {
+            vartype = Variable::Type::I32;
             pushInt32(value.toNumber());
           } else if (type.str == "str") {
+            vartype = Variable::Type::STR;
             for (size_t i = 0; i < value.str.size(); i++) {
               pushByte(value.str[i]);
             }
@@ -820,6 +947,9 @@ void xvm::Assembler::parse() {
             asmError("Unknown type '%.*s'", type.str.size(), type.str.data());
             return;
           }
+          m_variables[name.str].name = name.str;
+          m_variables[name.str].address = m_labels[name.str].address;
+          m_variables[name.str].type = vartype;
         } else if (m_tokens[m_index] == "syscall") {
           if (!isNextTokenOnSameLine()) {
             asmError("Expected syscall name");

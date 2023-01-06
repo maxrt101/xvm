@@ -4,7 +4,7 @@ export TOPDIR   := $(shell pwd)
 export PREFIX   := $(TOPDIR)/build
 
 export CXX      := g++
-export CXXFLAGS := -std=c++17 -I$(PREFIX)/include -lsdl2 -Wno-unsequenced
+export CXXFLAGS := -std=c++17 -I$(PREFIX)/include -Wno-unsequenced
 
 TARGET  := $(PREFIX)/bin/xvm
 SRC     :=  src/main.cc \
@@ -19,16 +19,23 @@ SRC     :=  src/main.cc \
             src/utils.cc \
             src/bus.cc \
             src/devices/ram.cc \
-            src/devices/video.cc \
             src/syscalls/io.cc \
             src/syscalls/sleep.cc \
-            src/syscalls/video.cc \
             src/syscalls/breakpoint.cc
 
 ifeq ("$(DEBUG)","1")
 $(info [!] Debug on)
 CXXFLAGS += -g3 -D_DEBUG
 endif
+
+ifeq ($(VIDEO),1)
+$(info [+] Video support on)
+CXXFLAGS += -lsdl2 -DXVM_FEATURE_VIDEO=1
+SRC += src/devices/video.cc src/syscalls/video.cc
+else
+$(info [-] Video support off)
+endif
+
 
 .PHONY: build
 

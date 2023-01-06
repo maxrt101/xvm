@@ -36,13 +36,17 @@ void vflogf(FILE* dest, LogLevel level, const std::string& format, va_list args)
 void vlogf(LogLevel level, const std::string& format, va_list args);
 void logf(LogLevel level, const std::string format, ...);
 
+void debug(int debugLevel, const std::string format, ...);
 void debug(const std::string format, ...);
 void info(const std::string format, ...);
 void warning(const std::string format, ...);
 void error(const std::string format, ...);
 void fatal(const std::string format, ...);
+
+#ifdef XVM_FEATURE_VIDEO
 void sdlError(std::string format, ...);
 void sdlFatal(std::string format, ...);
+#endif /* XVM_FEATURE_VIDEO */
 
 } /* namespace xvm */
 

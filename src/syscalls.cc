@@ -40,5 +40,7 @@ void xvm::registerSyscalls(VM* vm) {
   vm->registerSyscall(VMX_SYSCALL_VMCTL,      "vmctl",      [](VM* vm) {});
   vm->registerSyscall(VMX_SYSCALL_SYSCTL,     "sysctl",     [](VM* vm) {});
   vm->registerSyscall(VMX_SYSCALL_BREAKPOINT, "breakpoint", sys_breakpoint);
+#ifdef XVM_FEATURE_VIDEO
   vm->registerSyscall(VMX_SYSCALL_INIT_VIDEO, "init_video", sys_init_video);
+#endif /* XVM_FEATURE_VIDEO */
 }

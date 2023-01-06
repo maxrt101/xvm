@@ -27,16 +27,16 @@ xvm::config::BoolValue::BoolValue() : Value(config::Type::BOOL) {}
 xvm::config::VoidPtrValue::VoidPtrValue() : Value(config::Type::VOIDPTR) {}
 
 void xvm::config::initialize() {
-  setBool("debug", false);
+  setInt("debug", 0);
   setBool("disasm", false);
   setBool("hexdump", false);
+  setBool("include-symbols", true);
   setInt("ram_size", 1024);
-  setBool("raw", false);
   setString("version", XVM_VERSION);
-  setInt("version_code", XVM_VERSION_CODE);
-  setInt("version_major", XVM_VERSION_MAJOR);
-  setInt("version_minor", XVM_VERSION_MINOR);
-  setInt("version_patch", XVM_VERSION_PATCH);
+  setInt("version-code", XVM_VERSION_CODE);
+  setInt("version-major", XVM_VERSION_MAJOR);
+  setInt("version-minor", XVM_VERSION_MINOR);
+  setInt("version-patch", XVM_VERSION_PATCH);
 }
 
 bool xvm::config::exists(const std::string& name) {

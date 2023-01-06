@@ -24,6 +24,7 @@ enum class TokenType : uint8_t {
   COLON,
   DOT,
   AT,
+  DOLLAR,
   PLUS,
   MINUS,
 };
@@ -41,17 +42,6 @@ struct Token {
   bool operator==(const std::string& s) const;
 
   int32_t toNumber();
-
-  /*template <typename T>
-  inline T toNumber() const {
-    int base = 10;
-    if (str.size() > 2 && str[2] == 'b') base = 2;
-    if (str.size() > 2 && str[2] == 'x') base = 16;
-    T value = 0;
-    auto result = std::from_chars(str.data()+2, str.data() + str.size(), value, base);
-    if (result.ec == std::errc::invalid_argument) throw std::logic_error("Invalid number");
-    return value;
-  }*/
 };
 
 struct LabelMention {
@@ -60,18 +50,27 @@ struct LabelMention {
 
 struct Label {
   int32_t address = -1;
+  bool isProcedure = false;
   std::vector<LabelMention> mentions;
 };
 
-/* struct Variable {
+struct Variable {
   enum class Type {
-    I8, I16, I32
+    I8, I16, I32, STR
   };
-  
+
+  struct Mention {
+    int32_t address;
+    bool isDeref = false;
+  };
+
+  std::string name;
   int32_t address = 0;
   Type type;
-  std::vector<> mentions;
-}; */
+  std::vector<Mention> mentions;
+
+  static std::string typeToString(Type type);
+};
 
 class Assembler {
  private:
@@ -84,6 +83,7 @@ class Assembler {
 
   std::vector<uint8_t> m_code;
   std::unordered_map<std::string, Label> m_labels;
+  std::unordered_map<std::string, Variable> m_variables;
   std::unordered_map<std::string, int> m_syscalls;
   std::unordered_map<std::string, std::vector<Token>> m_defines;
 
@@ -97,7 +97,7 @@ class Assembler {
  public:
   Assembler(const std::string& filename, const std::string& source);
 
-  int assemble(Executable& exe);
+  int assemble(Executable& exe, bool includeSymbols = false);
 
   void setIncludeFolders(std::vector<std::string>& folders);
   void addIncludeFolder(const std::string& folder);
@@ -118,6 +118,7 @@ class Assembler {
   void tokenize();
   void parse();
   void patchLabels();
+  void patchVariables();
 
   int32_t getAddress();
   Token getNextToken();

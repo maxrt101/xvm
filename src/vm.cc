@@ -110,7 +110,7 @@ void xvm::VM::run() {
   m_running = true;
   while (m_running && m_ip < m_bus.max()) {
     uint8_t byte = next();
-    if (config::getBool("debug")) {
+    if (config::getInt("debug") > 0) {
       abi::disassembleInstruction(m_ram.getBuffer(), m_ip-1);
     }
     m_running = executeInstruction(abi::extractMode(byte), abi::extractOpcode(byte));
@@ -184,7 +184,7 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
       if (mode == IMM1 || mode == IMM2) {
         nextInt32(addr);
       } else if (mode == STK) {
-        StackType addr = m_stack.pop();
+        addr.i32 = m_stack.pop();
       } // TODO: Error Handling
       readInt16(result, addr.i32);
       m_stack.push(result.i16[0]);
@@ -550,7 +550,7 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
     }
   }
 
-  if (config::getBool("debug")) {
+  if (config::getInt("debug") > 0) {
     printf("       [ ");
     for (int i = m_stack.size()-1; i >= 0; i--) {
       printf("%d ", m_stack.peek(i));
@@ -570,7 +570,6 @@ uint8_t xvm::VM::peekNext() const {
 }
 
 uint8_t xvm::VM::next() {
-  // return m_bus.read(++m_ip);
   return m_bus.read(m_ip++);
 }
 
