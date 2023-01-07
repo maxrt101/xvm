@@ -60,10 +60,13 @@ static int compile(const std::string& filename, const std::string& output, std::
 
   if (xvm::config::getBool("disasm")) {
     printf("=== Disassembly ===\n");
-    // for (int i = 0; i < code.data.size(); ) {
-    //   i = xvm::abi::disassembleInstruction(code.data.data(), i);
-    // }
-    exe.disassemble();
+    if (xvm::config::getBool("fancy-disasm")) {
+      exe.disassemble();
+    } else {
+      for (int i = 0; i < code.data.size(); ) {
+        i = xvm::abi::disassembleInstruction(code.data.data(), i);
+      }
+    }
   }
 
   if (xvm::config::getBool("hexdump")) {
@@ -105,14 +108,21 @@ static int run(const std::string& filename) {
 
   if (xvm::config::getBool("disasm")) {
     printf("=== Disassembly ===\n");
-    // for (int i = 0; i < code.data.size(); ) {
-    //   i = xvm::abi::disassembleInstruction(code.data.data(), i);
-    // }
-    exe.disassemble();
+    if (xvm::config::getBool("fancy-disasm")) {
+      exe.disassemble();
+    } else {
+      for (int i = 0; i < code.data.size(); ) {
+        i = xvm::abi::disassembleInstruction(code.data.data(), i);
+      }
+    }
   }
 
   xvm::VM vm(xvm::config::getInt("ram_size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
+  
+  if (exe.hasSection("symbols")) {
+    vm.loadSymbols(xvm::SymbolTable::fromSection(exe.getSection("symbols")));
+  }
 
   if (xvm::config::getInt("debug") > 0) {
     printf("=== Execution Traces ===\n");
@@ -136,7 +146,7 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
   assembler.setIncludeFolders(includes);
 
   xvm::Executable exe;
-  if (int ret = assembler.assemble(exe)) {
+  if (int ret = assembler.assemble(exe, xvm::config::getBool("include-symbols"))) {
     xvm::error("Error assembling '%s' (ret=%d)", filename.c_str(), ret);
     return -1;
   }
@@ -156,13 +166,21 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
 
   if (xvm::config::getBool("disasm")) {
     printf("=== Disassembly ===\n");
-    for (int i = 0; i < code.data.size(); ) {
-      i = xvm::abi::disassembleInstruction(code.data.data(), i);
+    if (xvm::config::getBool("fancy-disasm")) {
+      exe.disassemble();
+    } else {
+      for (int i = 0; i < code.data.size(); ) {
+        i = xvm::abi::disassembleInstruction(code.data.data(), i);
+      }
     }
   }
 
   xvm::VM vm(xvm::config::getInt("ram_size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
+
+  if (exe.hasSection("symbols")) {
+    vm.loadSymbols(xvm::SymbolTable::fromSection(exe.getSection("symbols")));
+  }
 
   if (xvm::config::getInt("debug") > 0) {
     printf("=== Execution Traces ===\n");
@@ -203,18 +221,23 @@ static int dump(const std::string& filename) {
     printf("\nSection '%s'\n", section.label.c_str());
 
     if (xvm::config::getBool("hexdump")) {
-      // printf("=== Hexdump ===\n");
       auto bytes = section.toBytes();
       xvm::abi::hexdump(bytes.data(), bytes.size());
     }
 
     if (section.type == xvm::SectionType::CODE) {
-      exe.disassemble();
+      if (xvm::config::getBool("fancy-disasm")) {
+        exe.disassemble();
+      } else {
+        for (int i = 0; i < section.data.size(); ) {
+          i = xvm::abi::disassembleInstruction(section.data.data(), i);
+        }
+      }
     }
 
     if (section.type == xvm::SectionType::SYMBOLS) {
-      auto table = xvm::Executable::SymbolTable::fromSection(section);
-      xvm::printTable(xvm::Executable::SymbolTable::Symbol::getFieldNames(), table.symbols);
+      auto table = xvm::SymbolTable::fromSection(section);
+      xvm::printTable(xvm::SymbolTable::Symbol::getFieldNames(), table.symbols);
     }
 
     if (section.type == xvm::SectionType::DATA) {

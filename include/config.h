@@ -64,6 +64,7 @@ using CallbackType = std::function<void(Value*)>;
 
 void initialize();
 bool exists(const std::string& name);
+std::vector<std::string> getKeys();
 Type getType(const std::string& name);
 void onUpdate(const std::string& name, CallbackType cb);
 

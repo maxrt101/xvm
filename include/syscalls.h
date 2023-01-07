@@ -59,6 +59,7 @@ void sys_init_video(VM*);
 
 namespace utils {
 std::string busReadString(xvm::VM* vm, int32_t ptr);
+int getAddr(VM* vm, const std::string& str);
 int getInt(const std::string& str);
 } /* namespace utils */
 

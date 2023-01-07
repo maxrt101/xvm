@@ -55,38 +55,6 @@ struct Executable {
     static const std::vector<std::string> getFieldNames();
   };
 
-  struct SymbolTable {
-    struct Symbol {
-      uint32_t address;
-      uint16_t flags;
-      uint16_t data_width;
-      std::string label;
-
-      bool isLabel() const;
-      bool isProcedure() const;
-      bool isVariable() const;
-
-      std::vector<std::string> getStringLine() const;
-      static const std::vector<std::string> getFieldNames();
-    };
-
-    std::vector<Symbol> symbols;
-
-    void addSymbol(uint32_t address, const std::string& label, uint16_t flags = (uint16_t)SymbolFlags::LABEL, uint16_t data_width = 0);
-
-    Symbol& getByAddress(uint32_t address);
-    Symbol& getByLabel(const std::string& label);
-    // Symbol& getByAddress(uint32_t address);
-    // Symbol& getByLabel(const std::string& label);
-
-    bool hasAddress(uint32_t address) const;
-    bool hasLabel(const std::string& label) const;
-
-    Section toSection(const std::string& label = "symbols") const;
-
-    static SymbolTable fromSection(const Section& section);
-  };
-
   uint32_t magic = XVM_BAD_MAGIC;
   uint32_t version = 0;
   uint32_t flags = 0;
@@ -104,6 +72,36 @@ struct Executable {
 
   static Executable fromBuffer(const uint8_t* data);
   static Executable fromFile(const std::string& filename);
+};
+
+struct SymbolTable {
+  struct Symbol {
+    uint32_t address;
+    uint16_t flags;
+    uint16_t size;
+    std::string label;
+
+    bool isLabel() const;
+    bool isProcedure() const;
+    bool isVariable() const;
+
+    std::vector<std::string> getStringLine() const;
+    static const std::vector<std::string> getFieldNames();
+  };
+
+  std::vector<Symbol> symbols;
+
+  void addSymbol(uint32_t address, const std::string& label, uint16_t flags = (uint16_t)SymbolFlags::LABEL, uint16_t data_width = 0);
+
+  Symbol& getByAddress(uint32_t address);
+  Symbol& getByLabel(const std::string& label);
+
+  bool hasAddress(uint32_t address) const;
+  bool hasLabel(const std::string& label) const;
+
+  Executable::Section toSection(const std::string& label = "symbols") const;
+
+  static SymbolTable fromSection(const Executable::Section& section);
 };
 
 std::string sectionTypeToString(SectionType type);

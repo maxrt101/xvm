@@ -4,6 +4,7 @@
 #include <xvm/abi.h>
 #include <xvm/bus.h>
 #include <xvm/stack.h>
+#include <xvm/binary.h>
 #include <xvm/bytecode.h>
 #include <xvm/devices/ram.h>
 #include <xvm/devices/video.h>
@@ -41,6 +42,8 @@ class VM {
 
   std::unordered_map<int32_t, Syscall> m_syscalls;
 
+  SymbolTable symbols;
+
   bool m_running = false;
 
  public:
@@ -49,6 +52,7 @@ class VM {
 
   void loadRegion(size_t address, const uint8_t* data, size_t length);
   void printRegion(size_t start, size_t length);
+  void loadSymbols(const SymbolTable& table);
 
   void run();
   void stop();
@@ -62,6 +66,7 @@ class VM {
 
   bus::Bus& getBus();
   Stack<StackType>& getStack();
+  SymbolTable& getSymbols();
 
  private:
   uint8_t current() const;

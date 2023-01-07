@@ -1,6 +1,7 @@
 #include <xvm/syscalls.h>
 #include <xvm/devices/ram.h>
 #include <xvm/utils.h>
+#include <cctype>
 
 std::string xvm::utils::busReadString(xvm::VM* vm, int32_t ptr) {
   std::string str;
@@ -17,6 +18,19 @@ std::string xvm::utils::busReadString(xvm::VM* vm, int32_t ptr) {
   }
 
   return str;
+}
+
+int xvm::utils::getAddr(VM* vm, const std::string& str) {
+  if (str.size() && isdigit(str[0])) {
+    return getInt(str);
+  } else {
+    if (vm->getSymbols().symbols.size()) {
+      if (vm->getSymbols().hasLabel(str)) {
+        return vm->getSymbols().getByLabel(str).address;
+      }
+    }
+  }
+  return -1;
 }
 
 int xvm::utils::getInt(const std::string& str) {

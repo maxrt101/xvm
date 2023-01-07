@@ -72,6 +72,29 @@ int32_t xvm::Token::toNumber() {
   return std::stoi(base != 10 ? str.substr(2) : str, nullptr, base);
 }
 
+int xvm::Variable::size() const {
+  switch (type) {
+    case Type::I8:  return count;
+    case Type::I16: return count * 2;
+    case Type::I32: return count * 4;
+    case Type::STR: return count + 1;
+    default:        return count;
+  }
+}
+
+xvm::Variable::Type xvm::Variable::stringToType(const std::string& type) {
+  if (type == "i8") {
+    return Type::I8;
+  } else if (type == "i16") {
+    return Type::I16;
+  } else if (type == "i32") {
+    return Type::I32;
+  } else if (type == "str") {
+    return Type::STR;
+  } 
+  return Type::I8;
+}
+
 std::string xvm::Variable::typeToString(Type type) {
   switch (type) {
     case Type::I8:  return "i8";
@@ -111,26 +134,20 @@ int xvm::Assembler::assemble(Executable& exe, bool includeSymbols) {
   });
 
   if (includeSymbols) {
-    Executable::SymbolTable table;
+    SymbolTable table;
 
     for (auto& label : m_labels) {
-      int data_width = 0;
+      int size = 0;
       uint16_t flags = 0;
       if (m_variables.find(label.first) != m_variables.end()) {
         flags |= (uint16_t) SymbolFlags::VARIABLE;
-        switch (m_variables[label.first].type) {
-          case Variable::Type::I8:  { data_width = 1; break; }
-          case Variable::Type::I16: { data_width = 2; break; }
-          case Variable::Type::I32: { data_width = 4; break; }
-          case Variable::Type::STR: { data_width = m_variables[label.first].size + 1; break; }
-          default:                  { data_width = 0; break; }
-        }
+        size = m_variables[label.first].size();
       }
       table.addSymbol(
         label.second.address,
         label.first,
         flags | (uint16_t)(label.second.isProcedure ? SymbolFlags::PROCEDURE : SymbolFlags::LABEL),
-        data_width
+        size
       );
     }
 
@@ -927,20 +944,15 @@ void xvm::Assembler::parse() {
           }
           Token value = getNextToken();
           m_labels[name.str].address = m_code.size();
-          Variable::Type vartype;
-          int varsize = 0;
+          int count = 1;
           if (type.str == "i8") {
-            vartype = Variable::Type::I8;
             pushByte(value.toNumber());
           } else if (type.str == "i16") {
-            vartype = Variable::Type::I16;
             pushInt16(value.toNumber());
           } else if (type.str == "i32") {
-            vartype = Variable::Type::I32;
             pushInt32(value.toNumber());
           } else if (type.str == "str") {
-            vartype = Variable::Type::STR;
-            varsize = value.str.size();
+            count = value.str.size();
             for (size_t i = 0; i < value.str.size(); i++) {
               pushByte(value.str[i]);
             }
@@ -951,8 +963,8 @@ void xvm::Assembler::parse() {
           }
           m_variables[name.str].name = name.str;
           m_variables[name.str].address = m_labels[name.str].address;
-          m_variables[name.str].type = vartype;
-          m_variables[name.str].size = varsize;
+          m_variables[name.str].type = Variable::stringToType(type.str);
+          m_variables[name.str].count = count;
         } else if (m_tokens[m_index] == "syscall") {
           if (!isNextTokenOnSameLine()) {
             asmError("Expected syscall name");
@@ -1061,7 +1073,9 @@ void xvm::Assembler::parse() {
           }
           Token name = getNextToken();
           m_labels[name.str].address = m_code.size();
+          int count = 0;
           while (isNextTokenOnSameLine()) {
+            count++;
             int val = getNextToken().toNumber();
             if (type.str == "i8") {
               pushByte(val);
@@ -1074,6 +1088,10 @@ void xvm::Assembler::parse() {
               return;
             }
           }
+          m_variables[name.str].name = name.str;
+          m_variables[name.str].address = m_labels[name.str].address;
+          m_variables[name.str].type = Variable::stringToType(type.str);
+          m_variables[name.str].count = count;
         }
 
       }

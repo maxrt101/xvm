@@ -72,39 +72,39 @@ const std::vector<std::string> xvm::Executable::Section::getFieldNames() {
   return {"Label", "Type", "Size"};
 }
 
-bool xvm::Executable::SymbolTable::Symbol::isLabel() const {
+bool xvm::SymbolTable::Symbol::isLabel() const {
   return flags & (uint16_t) SymbolFlags::LABEL;
 }
 
-bool xvm::Executable::SymbolTable::Symbol::isProcedure() const {
+bool xvm::SymbolTable::Symbol::isProcedure() const {
   return flags & (uint16_t) SymbolFlags::PROCEDURE;
 }
 
-bool xvm::Executable::SymbolTable::Symbol::isVariable() const {
+bool xvm::SymbolTable::Symbol::isVariable() const {
   return flags & (uint16_t) SymbolFlags::VARIABLE;
 }
 
-std::vector<std::string> xvm::Executable::SymbolTable::Symbol::getStringLine() const {
+std::vector<std::string> xvm::SymbolTable::Symbol::getStringLine() const {
   char buffer[32] = {0};
   snprintf(buffer, sizeof buffer, "0x%x", address);
 
   return {
     buffer,
     std::string(isLabel() ? "L" : "-") + (isProcedure() ? "P" : "-") + (isVariable() ? "V" : "-"),
-    std::to_string(data_width),
+    std::to_string(size),
     label
   };
 }
 
-const std::vector<std::string> xvm::Executable::SymbolTable::Symbol::getFieldNames() {
+const std::vector<std::string> xvm::SymbolTable::Symbol::getFieldNames() {
   return {"Addr", "Flags", "Size", "Label"};
 }
 
-void xvm::Executable::SymbolTable::addSymbol(uint32_t address, const std::string& label, uint16_t flags, uint16_t data_width) {
-  symbols.push_back({address, flags, data_width, label});
+void xvm::SymbolTable::addSymbol(uint32_t address, const std::string& label, uint16_t flags, uint16_t size) {
+  symbols.push_back({address, flags, size, label});
 }
 
-xvm::Executable::SymbolTable::Symbol& xvm::Executable::SymbolTable::getByAddress(uint32_t address) {
+xvm::SymbolTable::Symbol& xvm::SymbolTable::getByAddress(uint32_t address) {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return symbol;
@@ -113,7 +113,7 @@ xvm::Executable::SymbolTable::Symbol& xvm::Executable::SymbolTable::getByAddress
   throw "No such symbol";
 }
 
-xvm::Executable::SymbolTable::Symbol& xvm::Executable::SymbolTable::getByLabel(const std::string& label) {
+xvm::SymbolTable::Symbol& xvm::SymbolTable::getByLabel(const std::string& label) {
   for (auto& symbol : symbols) {
     if (symbol.label == label) {
       return symbol;
@@ -122,7 +122,7 @@ xvm::Executable::SymbolTable::Symbol& xvm::Executable::SymbolTable::getByLabel(c
   throw "No such symbol";
 }
 
-bool xvm::Executable::SymbolTable::hasAddress(uint32_t address) const {
+bool xvm::SymbolTable::hasAddress(uint32_t address) const {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return true;
@@ -131,7 +131,7 @@ bool xvm::Executable::SymbolTable::hasAddress(uint32_t address) const {
   return false;
 }
 
-bool xvm::Executable::SymbolTable::hasLabel(const std::string& label) const {
+bool xvm::SymbolTable::hasLabel(const std::string& label) const {
   for (auto& symbol : symbols) {
     if (symbol.label == label) {
       return true;
@@ -140,8 +140,8 @@ bool xvm::Executable::SymbolTable::hasLabel(const std::string& label) const {
   return false;
 }
 
-xvm::Executable::Section xvm::Executable::SymbolTable::toSection(const std::string& label) const {
-  Section section;
+xvm::Executable::Section xvm::SymbolTable::toSection(const std::string& label) const {
+  Executable::Section section;
   abi::N32 n;
 
   section.label = label;
@@ -157,7 +157,7 @@ xvm::Executable::Section xvm::Executable::SymbolTable::toSection(const std::stri
     section.data.push_back(n.u8[0]);
     section.data.push_back(n.u8[1]);
 
-    n.u16[0] = symbol.data_width;
+    n.u16[0] = symbol.size;
     section.data.push_back(n.u8[0]);
     section.data.push_back(n.u8[1]);
 
@@ -169,7 +169,7 @@ xvm::Executable::Section xvm::Executable::SymbolTable::toSection(const std::stri
   return section;
 }
 
-xvm::Executable::SymbolTable xvm::Executable::SymbolTable::fromSection(const Section& section) {
+xvm::SymbolTable xvm::SymbolTable::fromSection(const Executable::Section& section) {
   SymbolTable table;
   abi::N32 n;
 
@@ -183,7 +183,7 @@ xvm::Executable::SymbolTable xvm::Executable::SymbolTable::fromSection(const Sec
     symbol.flags = n.u16[0];
 
     readInt16(n, section.data.data(), i += 2);
-    symbol.data_width = n.u16[0];
+    symbol.size = n.u16[0];
 
     i += 2;
 
@@ -245,8 +245,8 @@ void xvm::Executable::disassemble() const {
       }
       // printf("0x%04x | %-8s %-4s ", offset, opCodeToString(opcode).c_str(), addressingModeToString(mode).c_str());
       printf("0x%04x | %s | ", i, symbol.label.c_str());
-      char* buffer = new char[symbol.data_width+1] {0};
-      for (int idx = 0; idx < symbol.data_width; i++) {
+      char* buffer = new char[symbol.size+1] {0};
+      for (int idx = 0; idx < symbol.size; i++) {
         printf("%02x ", code.data[i]);
         buffer[idx++] = isprint(code.data[i]) ? code.data[i] : '.';
       }

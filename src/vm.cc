@@ -54,12 +54,20 @@ void xvm::VM::printRegion(size_t start, size_t length) {
   }
 }
 
+void xvm::VM::loadSymbols(const SymbolTable& table) {
+  symbols = table;
+}
+
 xvm::bus::Bus& xvm::VM::getBus() {
   return m_bus;
 }
 
 Stack<xvm::VM::StackType>& xvm::VM::getStack() {
   return m_stack;
+}
+
+xvm::SymbolTable& xvm::VM::getSymbols() {
+  return symbols;
 }
 
 void xvm::VM::jump(int32_t address) {

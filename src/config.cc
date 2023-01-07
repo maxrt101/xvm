@@ -30,6 +30,7 @@ void xvm::config::initialize() {
   setInt("debug", 0);
   setBool("disasm", false);
   setBool("hexdump", false);
+  setBool("fancy-disasm", true);
   setBool("include-symbols", true);
   setInt("ram_size", 1024);
   setString("version", XVM_VERSION);
@@ -41,6 +42,16 @@ void xvm::config::initialize() {
 
 bool xvm::config::exists(const std::string& name) {
   return g_config.find(name) != g_config.end();
+}
+
+std::vector<std::string> xvm::config::getKeys() {
+  std::vector<std::string> keys;
+
+  for (auto& [k, v] : g_config) {
+    keys.push_back(k);
+  }
+
+  return keys;
 }
 
 xvm::config::Type xvm::config::getType(const std::string& name) {
@@ -74,7 +85,7 @@ void xvm::config::setFromString(const std::string& name, const std::string& valu
       break;
     }
     case Type::BOOL: {
-      setBool(name, value == "true" || value == "1" || value == "y");
+      setBool(name, value == "true" || value == "1" || value == "y" || value == "yes" || value == "on" || value == "enable");
       break;
     }
     case Type::VOIDPTR: {

@@ -1,5 +1,6 @@
 #include <xvm/syscalls.h>
 #include <xvm/devices/ram.h>
+#include <xvm/bytecode.h>
 #include <xvm/config.h>
 #include <xvm/utils.h>
 #include <xvm/log.h>
@@ -7,6 +8,14 @@
 
 #include <iostream>
 #include <string>
+
+#define CHECK_ADDR_OUTPUT(x, s) \
+  do { \
+    if ((x) == -1) { \
+      error("Invalid value ('%s')", (s).c_str()); \
+      continue; \
+    } \
+  } while (0)
 
 void xvm::sys_breakpoint(VM* vm) {
   bool running = true;
@@ -40,15 +49,20 @@ void xvm::sys_breakpoint(VM* vm) {
           printf("Usage: getopt NAME\n");
         } else if (tokens[1] == "setopt") {
           printf("Usage: setopt NAME VALUE\n");
+        } else if (tokens[1] == "config") {
+          printf("Usage: config\n");
         } else if (tokens[1] == "print") {
-          printf("Usage: print stack\n");
-          printf("Usage: print ram ADDR LEN\n");
-          printf("Usage: print TYPE ADDR\n");
+          printf(
+            "Usage: print stack\n"
+            "Usage: print ram ADDR LEN\n"
+            "Usage: print code ADDR LEN\n"
+            "Usage: print TYPE ADDR\n"
+          );
         }
       } else {
-        printf("Available commands: help halt continue reset print getopt setopt push pop set jump call\n");
+        printf("Available commands: help halt continue reset print getopt setopt config push pop set jump call\n");
       }
-    } else if (tokens[0] == "halt" || tokens[0] == "exit" || tokens[0] == "q") {
+    } else if (tokens[0] == "halt" || tokens[0] == "exit" || tokens[0] == "quit" || tokens[0] == "q") {
       vm->stop();
       running = false;
     } else if (tokens[0] == "continue" || tokens[0] == "c") {
@@ -58,7 +72,9 @@ void xvm::sys_breakpoint(VM* vm) {
         error("Usage: push VALUE");
         continue;
       }
-      vm->getStack().push(utils::getInt(tokens[1]));
+      int val = utils::getAddr(vm, tokens[1]);
+      CHECK_ADDR_OUTPUT(val, tokens[1]);
+      vm->getStack().push(val);
     } else if (tokens[0] == "pop") {
       printf("%d\n", vm->getStack().pop());
     } else if (tokens[0] == "jump" || tokens[0] == "j") {
@@ -66,13 +82,17 @@ void xvm::sys_breakpoint(VM* vm) {
         error("Usage: jump ADDR");
         continue;
       }
-      vm->jump(utils::getInt(tokens[1]));
+      int val = utils::getAddr(vm, tokens[1]);
+      CHECK_ADDR_OUTPUT(val, tokens[1]);
+      vm->jump(val);
     } else if (tokens[0] == "call") {
       if (tokens.size() != 2) {
         error("Usage: call ADDR");
         continue;
       }
-      vm->call(utils::getInt(tokens[1]));
+      int val = utils::getAddr(vm, tokens[1]);
+      CHECK_ADDR_OUTPUT(val, tokens[1]);
+      vm->call(val);
     } else if (tokens[0] == "reset" || tokens[0] == "r") {
       vm->reset();
     } else if (tokens[0] == "set" || tokens[0] == "s") {
@@ -80,12 +100,16 @@ void xvm::sys_breakpoint(VM* vm) {
       int32_t addr = 0;
       int32_t value = 0;
       if (tokens.size() == 3) {
-        addr = utils::getInt(tokens[1]);
-        value = utils::getInt(tokens[2]);
+        addr = utils::getAddr(vm, tokens[1]);
+        CHECK_ADDR_OUTPUT(addr, tokens[1]);
+        value = utils::getAddr(vm, tokens[2]);
+        CHECK_ADDR_OUTPUT(value, tokens[2]);
       } else if (tokens.size() == 4) {
         type = tokens[1];
-        addr = utils::getInt(tokens[2]);
-        value = utils::getInt(tokens[3]);
+        addr = utils::getAddr(vm, tokens[2]);
+        CHECK_ADDR_OUTPUT(addr, tokens[2]);
+        value = utils::getAddr(vm, tokens[3]);
+        CHECK_ADDR_OUTPUT(value, tokens[3]);
       } else {
         error("Usage: set [TYPE=i8] ADDR VALUE");
       }
@@ -118,6 +142,11 @@ void xvm::sys_breakpoint(VM* vm) {
         continue;
       }
       config::setFromString(tokens[1], tokens[2]);
+    } else if (tokens[0] == "config" || tokens[0] == "conf" || tokens[0] == "cfg") {
+      auto keys = config::getKeys();
+      for (auto& key : keys) {
+        printf("%s: '%s'\n", key.c_str(), config::getAsString(key).c_str());
+      }
     } else if (tokens[0] == "print" || tokens[0] == "p") {
       if (tokens.size() > 1) {
         if (tokens[1] == "stack" || tokens[1] == "s") {
@@ -131,16 +160,32 @@ void xvm::sys_breakpoint(VM* vm) {
             error("Usage: 'print ram ADDR LEN'");
             continue;
           }
-          int addr = utils::getInt(tokens[2]);
-          int len = utils::getInt(tokens[3]);
+          int addr = utils::getAddr(vm, tokens[2]);
+          CHECK_ADDR_OUTPUT(addr, tokens[2]);
+          int len = utils::getAddr(vm, tokens[3]);
+          CHECK_ADDR_OUTPUT(len, tokens[3]);
           auto ram = (bus::device::RAM*)vm->getBus().getDeviceByAddress(addr);
           abi::hexdump(ram->getBuffer() + addr, len);
+        } else if (tokens[1] == "code" || tokens[1] == "c") {
+          if (tokens.size() != 4) {
+            error("Usage: 'print code ADDR LEN'");
+            continue;
+          }
+          int addr = utils::getAddr(vm, tokens[2]);
+          CHECK_ADDR_OUTPUT(addr, tokens[2]);
+          int len = utils::getAddr(vm, tokens[3]);
+          CHECK_ADDR_OUTPUT(len, tokens[3]);
+          auto ram = (bus::device::RAM*)vm->getBus().getDeviceByAddress(addr);
+          for (int i = 0; i < len; ) {
+            i = xvm::abi::disassembleInstruction(ram->getBuffer() + addr, i);
+          }
         } else {
           if (tokens.size() != 3) {
             error("Usage: 'print TYPE ADDR'");
             continue;
           }
-          int addr = utils::getInt(tokens[2]);
+          int addr = utils::getAddr(vm, tokens[2]);
+          CHECK_ADDR_OUTPUT(addr, tokens[2]);
           if (tokens[1] == "i8") {
             printf("0x%x\n", vm->getBus().read(addr));
           } else if (tokens[1] == "i16") {
@@ -161,6 +206,8 @@ void xvm::sys_breakpoint(VM* vm) {
             error("Unknown type");
           }
         }
+      } else {
+        error("Type 'help print' for usage");
       }
     } else {
       error("Unknown command");
