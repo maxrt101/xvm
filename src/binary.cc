@@ -240,32 +240,20 @@ void xvm::Executable::disassemble() const {
   for (int i = 0; i < code.data.size(); ) {
     if (hasSymbols && table.hasAddress(i)) {
       const auto& symbol = table.getByAddress(i);
-      if (!symbol.isVariable()) {
-        goto regular_disassemble;
+      if (symbol.isVariable()) {
+        printf("0x%04x | %s | ", i, symbol.label.c_str());
+        char* buffer = new char[symbol.size+1] {0};
+        for (int idx = 0; idx < symbol.size; i++) {
+          printf("%02x ", code.data[i]);
+          buffer[idx++] = isprint(code.data[i]) ? code.data[i] : '.';
+        }
+        printf("| %s\n", buffer);
+        delete [] buffer;
+        continue;
       }
-      // printf("0x%04x | %-8s %-4s ", offset, opCodeToString(opcode).c_str(), addressingModeToString(mode).c_str());
-      printf("0x%04x | %s | ", i, symbol.label.c_str());
-      char* buffer = new char[symbol.size+1] {0};
-      for (int idx = 0; idx < symbol.size; i++) {
-        printf("%02x ", code.data[i]);
-        buffer[idx++] = isprint(code.data[i]) ? code.data[i] : '.';
-      }
-      printf("| %s\n", buffer);
-      delete [] buffer;
-
-      // i += 1;
-      /*
-      0x005d | ret      STK
-      0x005e | push     IMM1 10
-      0x0063 | syscall  IMM1 0x14
-      0x0068 | ret      STK
-      0x0069 | halt     IMM1
-      0x006a | greet_string | 48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 21 0a 00 | Hello, World!..
-      */
-    } else {
-regular_disassemble:
-      i = xvm::abi::disassembleInstruction(code.data.data(), i);
     }
+
+    i = xvm::abi::disassembleInstruction(code.data.data(), i);
   }
 }
 

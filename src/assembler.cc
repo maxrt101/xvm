@@ -258,7 +258,7 @@ void xvm::Assembler::asmError(const Token& t, const char* fmt, ...) {
   m_hadError = true;
   va_list args;
   va_start(args, fmt);
-  fprintf(stderr, "%s:%d Error near '%.*s': ", m_filename.c_str(), t.line, static_cast<int>(t.str.size()), t.str.data());
+  fprintf(stderr, "%s:%d %sError%s near '%.*s': ", m_filename.c_str(), t.line, colors::RED, colors::RESET, static_cast<int>(t.str.size()), t.str.data());
   vfprintf(stderr, fmt, args);
   fprintf(stderr, "\n");
   va_end(args);
@@ -983,15 +983,22 @@ void xvm::Assembler::parse() {
             return;
           }
           Token file = getNextToken();
+          bool fileIncluded = false;
           if (isFileExists(std::string(file.str))) {
             includeFile(std::string(file.str));
+            fileIncluded = true;
           } else {
             for (std::string& folder : m_includeFolders) {
               if (isFileExists(folder + std::string(file.str))) {
                 includeFile(folder + std::string(file.str));
+                fileIncluded = true;
                 break;
               }
             }
+          }
+          if (!fileIncluded) {
+            asmError(file, "Can't include '%s': no such file found in include path", file.str.c_str());
+            return;
           }
         } else if (m_tokens[m_index] == "define") {
           define();

@@ -1,10 +1,10 @@
 #ifndef _XVM_VERSION_H_
 #define _XVM_VERSION_H_ 1
 
-#define XVM_VERSION "0.1.1"
+#define XVM_VERSION "0.1.2"
 #define XVM_VERSION_MAJOR 0
 #define XVM_VERSION_MINOR 1
-#define XVM_VERSION_PATCH 1
-#define XVM_VERSION_CODE  0x00000101
+#define XVM_VERSION_PATCH 2
+#define XVM_VERSION_CODE  0x00000102
 
 #endif

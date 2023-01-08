@@ -74,6 +74,19 @@ xvm::bus::Device* xvm::bus::Bus::getDeviceByName(const std::string& name) const 
   return nullptr;
 }
 
+xvm::bus::Bus::Dev xvm::bus::Bus::getDevByName(const std::string& name) {
+  for (auto& dev : m_devices) {
+    if (dev.device->getName() == name) {
+      return dev;
+    }
+  }
+  return {};
+}
+
+std::vector<xvm::bus::Bus::Dev> xvm::bus::Bus::getDevs() {
+  return m_devices;
+}
+
 size_t xvm::bus::Bus::min() const {
   return m_min;
 }

@@ -51,6 +51,9 @@ class Bus {
   Device* getDeviceByAddress(size_t address) const;
   Device* getDeviceByName(const std::string& name) const;
 
+  Dev getDevByName(const std::string& name);
+  std::vector<Dev> getDevs();
+
   size_t min() const;
   size_t max() const;
 };

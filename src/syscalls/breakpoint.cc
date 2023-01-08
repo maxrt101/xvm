@@ -51,6 +51,11 @@ void xvm::sys_breakpoint(VM* vm) {
           printf("Usage: setopt NAME VALUE\n");
         } else if (tokens[1] == "config") {
           printf("Usage: config\n");
+        } else if (tokens[1] == "bus") {
+          printf(
+            "Usage: bus list\n"
+            "Usage: bus [DEVICE]\n"
+          );
         } else if (tokens[1] == "print") {
           printf(
             "Usage: print stack\n"
@@ -60,7 +65,7 @@ void xvm::sys_breakpoint(VM* vm) {
           );
         }
       } else {
-        printf("Available commands: help halt continue reset print getopt setopt config push pop set jump call\n");
+        printf("Available commands: help halt continue reset print getopt setopt config bus push pop set jump call\n");
       }
     } else if (tokens[0] == "halt" || tokens[0] == "exit" || tokens[0] == "quit" || tokens[0] == "q") {
       vm->stop();
@@ -146,6 +151,24 @@ void xvm::sys_breakpoint(VM* vm) {
       auto keys = config::getKeys();
       for (auto& key : keys) {
         printf("%s: '%s'\n", key.c_str(), config::getAsString(key).c_str());
+      }
+    } else if (tokens[0] == "bus") {
+      if (tokens.size() > 1) {
+        if (tokens[1] == "list" || tokens[1] == "l") {
+          auto devices = vm->getBus().getDevs();
+          for (auto& device : devices) {
+            printf("0x%08zx 0x%08zx %s\n", device.beginAddr, device.endAddr, device.device->getName().c_str());
+          }
+        } else {
+          auto device = vm->getBus().getDevByName(tokens[1]);
+          if (!device.device) {
+            error("No such device binded");
+            continue;
+          }
+          printf("0x%08zx 0x%08zx %s\n", device.beginAddr, device.endAddr, device.device->getName().c_str());
+        }
+      } else {
+        error("Type 'help bus' for usage");
       }
     } else if (tokens[0] == "print" || tokens[0] == "p") {
       if (tokens.size() > 1) {
