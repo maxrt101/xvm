@@ -4,7 +4,7 @@
 #include <xvm/abi.h>
 #include <xvm/bus.h>
 #include <xvm/stack.h>
-#include <xvm/binary.h>
+#include <xvm/executable.h>
 #include <xvm/bytecode.h>
 #include <xvm/devices/ram.h>
 #include <xvm/devices/video.h>
@@ -35,6 +35,7 @@ class VM {
 #ifdef XVM_FEATURE_VIDEO
   bus::device::Video m_video;
 #endif /* XVM_FEATURE_VIDEO */
+
   size_t m_ip = 0;
 
   Stack<StackType> m_stack;
@@ -42,7 +43,7 @@ class VM {
 
   std::unordered_map<int32_t, Syscall> m_syscalls;
 
-  SymbolTable symbols;
+  SymbolTable m_symbols;
 
   bool m_running = false;
 
@@ -81,10 +82,15 @@ class VM {
   void writeInt16(abi::N32& value, StackType addr);
   void writeInt32(abi::N32& value, StackType addr);
 
+  void readArg(abi::N32& arg, const abi::AddressingMode mode);
+  void readArgs(abi::N32* args, const abi::AddressingMode mode[2]);
+  void readArgNoImm(abi::N32& value, const abi::AddressingMode mode);
+  void readAddr(abi::N32& value, const abi::AddressingMode mode);
+
   void pushCall(CallStackType value);
   CallStackType popCall();
 
-  bool executeInstruction(abi::AddressingMode mode, abi::OpCode opcode);
+  bool executeInstruction(const abi::AddressingMode mode[2], const abi::OpCode opcode);
 };
 
 } /* namespace xvm */

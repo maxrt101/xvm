@@ -55,7 +55,7 @@ void xvm::VM::printRegion(size_t start, size_t length) {
 }
 
 void xvm::VM::loadSymbols(const SymbolTable& table) {
-  symbols = table;
+  m_symbols = table;
 }
 
 xvm::bus::Bus& xvm::VM::getBus() {
@@ -67,7 +67,7 @@ Stack<xvm::VM::StackType>& xvm::VM::getStack() {
 }
 
 xvm::SymbolTable& xvm::VM::getSymbols() {
-  return symbols;
+  return m_symbols;
 }
 
 void xvm::VM::jump(int32_t address) {
@@ -115,17 +115,24 @@ void xvm::VM::reset() {
 }
 
 void xvm::VM::run() {
+  using namespace abi;
+
   m_running = true;
+
   while (m_running && m_ip < m_bus.max()) {
-    uint8_t byte = next();
-    if (config::getInt("debug") > 0) {
-      abi::disassembleInstruction(m_ram.getBuffer(), m_ip-1);
+    uint8_t flags = next();
+    uint8_t opcode = next();
+
+    if (config::asInt("debug") > 0) {
+      disassembleInstruction(m_ram.getBuffer(), m_ip-2);
     }
-    m_running = executeInstruction(abi::extractMode(byte), abi::extractOpcode(byte));
+
+    AddressingMode mode[2] {extractModeArg1(flags), extractModeArg2(flags)};
+    m_running = executeInstruction(mode, (OpCode) opcode);
   }
 }
 
-bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
+bool xvm::VM::executeInstruction(const abi::AddressingMode mode[2], const abi::OpCode opcode) {
   using namespace xvm::abi;
 
   switch (opcode) {
@@ -141,18 +148,19 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
     }
     case PUSH: {
       N32 n;
-      nextInt32(n);
-      m_stack.push(n.i32);
+      readAddr(n, mode[0]);
+      m_stack.push(n._i32);
       break;
     }
     case POP: {
       N32 count;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(count);
       } else {
-        count.i32 = 1;
+        // TODO: Support STK mode ?
+        count._i32 = 1;
       }
-      for (int i = 0; i < count.i32; i++) {
+      for (int i = 0; i < count._i32; i++) {
         m_stack.pop();
       }
       break;
@@ -179,373 +187,224 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
     }
     case DEREF8: {
       N32 addr;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      m_stack.push(m_bus.read(addr.i32));
+      m_stack.push(m_bus.read(addr._i32));
       break;
     }
     case DEREF16: {
       N32 addr, result;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      readInt16(result, addr.i32);
-      m_stack.push(result.i16[0]);
+      readInt16(result, addr._i32);
+      m_stack.push(result._i16[0]);
       break;
     }
     case DEREF32: {
       N32 addr, result;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      readInt32(result, addr.i32);
-      m_stack.push(result.i32);
+      readInt32(result, addr._i32);
+      m_stack.push(result._i32);
       break;
     }
     case STORE8: {
       N32 addr, value;
-      value.i32 = m_stack.pop();
-      if (mode == IMM1 || mode == IMM2) {
+      value._i32 = m_stack.pop();
+      if (mode[1] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[1] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      m_bus.write(addr.i32, value.i8[0]);
+      m_bus.write(addr._i32, value._i8[0]);
       break;
     }
     case STORE16: {
       N32 addr, value;
-      value.i32 = m_stack.pop();
-      if (mode == IMM1 || mode == IMM2) {
+      value._i32 = m_stack.pop();
+      if (mode[1] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[1] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      writeInt16(value, addr.i32);
+      writeInt16(value, addr._i32);
       break;
     }
     case STORE32: {
       N32 addr, value;
-      value.i32 = m_stack.pop();
-      if (mode == IMM1 || mode == IMM2) {
+      value._i32 = m_stack.pop();
+      if (mode[1] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[1] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      writeInt32(value, addr.i32);
+      writeInt32(value, addr._i32);
       break;
     }
     case LOAD8: {
       N32 addr;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      m_stack.push(m_bus.read(addr.i32));
+      m_stack.push(m_bus.read(addr._i32));
       break;
     }
     case LOAD16: {
       N32 addr, value;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      readInt16(value, addr.i32);
-      m_stack.push(value.i32);
+      readInt16(value, addr._i32);
+      m_stack.push(value._i32);
       break;
     }
     case LOAD32: {
       N32 addr, value;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(addr);
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        addr._i32 = m_stack.pop();
       } // TODO: Error Handling
-      readInt32(value, addr.i32);
-      m_stack.push(value.i32);
+      readInt32(value, addr._i32);
+      m_stack.push(value._i32);
       break;
     }
     case ADD: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 + val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 + val[0]._i32);
       break;
     }
     case SUB: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 - val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 - val[0]._i32);
       break;
     }
     case MUL: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 * val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 * val[0]._i32);
       break;
     }
     case DIV: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 / val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 / val[0]._i32);
       break;
     }
     case EQU: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 == val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 == val[0]._i32);
       break;
     }
     case LT: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 < val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 < val[0]._i32);
       break;
     }
     case GT: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 > val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 > val[0]._i32);
       break;
     }
     case DEC: {
       N32 value;
-      if (mode == IND) {
-        readInt32(value, m_stack.pop());
-      } else if (mode == STK) {
-        value.i32 = m_stack.pop();
-      } /* TODO: Error Handling */
-      m_stack.push(value.i32 - 1);
+      readArgNoImm(value, mode[0]);
+      m_stack.push(value._i32 - 1);
       break;
     }
     case INC: {
       N32 value;
-      if (mode == IND) {
-        readInt32(value, m_stack.pop());
-      } else if (mode == STK) {
-        value.i32 = m_stack.pop();
-      } /* TODO: Error Handling */
-      m_stack.push(value.i32 + 1);
+      readArgNoImm(value, mode[0]);
+      m_stack.push(value._i32 + 1);
       break;
     }
     case SHL: {
       N32 value, shift;
       nextInt32(shift);
-      if (mode == IND) {
-        readInt32(value, m_stack.pop());
-      } else if (mode == STK) {
-        value.i32 = m_stack.pop();
-      } /* TODO: Error Handling */
-      m_stack.push(value.i32 << shift.i32);
+      readArgNoImm(value, mode[1]); // FIXME: mode[0] or mode[1] ?
+      m_stack.push(value._i32 << shift._i32);
       break;
     }
     case SHR: {
       N32 value, shift;
       nextInt32(shift);
-      if (mode == IND) {
-        readInt32(value, m_stack.pop());
-      } else if (mode == STK) {
-        value.i32 = m_stack.pop();
-      } /* TODO: Error Handling */
-      m_stack.push(value.i32 >> shift.i32);
+      readArgNoImm(value, mode[1]); // FIXME: mode[0] or mode[1] ?
+      m_stack.push(value._i32 >> shift._i32);
       break;
     }
     case AND: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 & val1.i32);
-      break;
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 & val[0]._i32);
       break;
     }
     case OR: {
-      N32 val1, val2;
-      if (mode == IMM1) {
-        val2.i32 = m_stack.pop();
-        nextInt32(val1);
-      } else if (mode == IMM2) {
-        nextInt32(val1);
-        nextInt32(val2);
-      } else if (mode == IND) {
-        readInt32(val1, m_stack.pop());
-        readInt32(val2, m_stack.pop());
-      } else if (mode == STK) {
-        val1.i32 = m_stack.pop();
-        val2.i32 = m_stack.pop();
-      }
-      m_stack.push(val2.i32 | val1.i32);
+      N32 val[2];
+      readArgs(val, mode);
+      m_stack.push(val[1]._i32 | val[0]._i32);
       break;
     }
     case JUMP: {
       N32 addr;
-      if (mode == IMM1 || mode == IMM2) {
-        nextInt32(addr);
-      } else if (mode == IND) {
-        readInt32(addr, m_stack.pop());
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
-      }
-      jump(addr.i32);
+      readAddr(addr, mode[0]);
+      jump(addr._i32);
       break;
     }
     case JUMPT: {
       int32_t condition = m_stack.pop();
       N32 addr;
-      if (mode == IMM1 || mode == IMM2) {
-        nextInt32(addr);
-      } else if (mode == IND) {
-        readInt32(addr, m_stack.pop());
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
-      }
+      readAddr(addr, mode[0]);
       if (condition) {
-        jump(addr.i32);
+        jump(addr._i32);
       }
       break;
     }
     case JUMPF: {
       int32_t condition = m_stack.pop();
       N32 addr;
-      if (mode == IMM1 || mode == IMM2) {
-        nextInt32(addr);
-      } else if (mode == IND) {
-        readInt32(addr, m_stack.pop());
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
-      }
+      readAddr(addr, mode[0]);
       if (!condition) {
-        jump(addr.i32);
+        jump(addr._i32);
       }
       break;
     }
     case CALL: {
       N32 addr;
-      if (mode == IMM1 || mode == IMM2) {
-        nextInt32(addr);
-      } else if (mode == IND) {
-        readInt32(addr, m_stack.pop());
-      } else if (mode == STK) {
-        addr.i32 = m_stack.pop();
-      }
+      readAddr(addr, mode[0]);
       pushCall(m_ip);
-      jump(addr.i32);
+      jump(addr._i32);
       break;
     }
     case SYSCALL: {
       N32 number;
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         nextInt32(number);
-      } else if (mode == STK) {
-        number.i32 = m_stack.pop();
+      } else if (mode[0] == STK) {
+        number._i32 = m_stack.pop();
       } // TODO: Handle Errors
-      if (m_syscalls.find(number.i32) == m_syscalls.end()) {
-        error("No syscall with number '0x%x'", number.i32);
+      if (m_syscalls.find(number._i32) == m_syscalls.end()) {
+        error("No syscall with number '0x%x'", number._i32);
         return false;
       }
-      m_syscalls[number.i32].function(this);
+      m_syscalls[number._i32].function(this);
       break;
     }
     case RET: {
@@ -553,12 +412,14 @@ bool xvm::VM::executeInstruction(abi::AddressingMode mode, abi::OpCode opcode) {
       break;
     }
     default: {
-      error("Unknown Instruction '0x%x' (mode: %s)", opcode, addressingModeToString(mode).c_str());
+      error("Unknown Instruction '0x%x' (flags: %s %s)", opcode,
+        addressingModeToString(mode[0]).c_str(),
+        addressingModeToString(mode[1]).c_str());
       return false;
     }
   }
 
-  if (config::getInt("debug") > 0) {
+  if (config::asInt("debug") > 0) {
     printf("       [ ");
     for (int i = m_stack.size()-1; i >= 0; i--) {
       printf("%d ", m_stack.peek(i));
@@ -582,39 +443,105 @@ uint8_t xvm::VM::next() {
 }
 
 void xvm::VM::nextInt16(abi::N32& value) {
-  value.u8[0] = next();
-  value.u8[1] = next();
+  value._u8[0] = next();
+  value._u8[1] = next();
 }
 
 void xvm::VM::nextInt32(abi::N32& value) {
-  value.u8[0] = next();
-  value.u8[1] = next();
-  value.u8[2] = next();
-  value.u8[3] = next();
+  value._u8[0] = next();
+  value._u8[1] = next();
+  value._u8[2] = next();
+  value._u8[3] = next();
 }
 
 void xvm::VM::readInt16(abi::N32& value, StackType addr) {
-  value.u8[0] = m_bus.read(addr);
-  value.u8[1] = m_bus.read(addr+1);
+  value._u8[0] = m_bus.read(addr);
+  value._u8[1] = m_bus.read(addr+1);
 }
 
 void xvm::VM::readInt32(abi::N32& value, StackType addr) {
-  value.u8[0] = m_bus.read(addr);
-  value.u8[1] = m_bus.read(addr+1);
-  value.u8[2] = m_bus.read(addr+2);
-  value.u8[3] = m_bus.read(addr+3);
+  value._u8[0] = m_bus.read(addr);
+  value._u8[1] = m_bus.read(addr+1);
+  value._u8[2] = m_bus.read(addr+2);
+  value._u8[3] = m_bus.read(addr+3);
 }
 
 void xvm::VM::writeInt16(abi::N32& value, StackType addr) {
-  m_bus.write(addr, value.u8[0]);
-  m_bus.write(addr+1, value.u8[1]);
+  m_bus.write(addr, value._u8[0]);
+  m_bus.write(addr+1, value._u8[1]);
 }
 
 void xvm::VM::writeInt32(abi::N32& value, StackType addr) {
-  m_bus.write(addr, value.u8[0]);
-  m_bus.write(addr+1, value.u8[1]);
-  m_bus.write(addr+2, value.u8[2]);
-  m_bus.write(addr+3, value.u8[3]);
+  m_bus.write(addr, value._u8[0]);
+  m_bus.write(addr+1, value._u8[1]);
+  m_bus.write(addr+2, value._u8[2]);
+  m_bus.write(addr+3, value._u8[3]);
+}
+
+void xvm::VM::readArg(abi::N32& arg, const abi::AddressingMode mode) {
+  using namespace xvm::abi;
+
+  switch (mode) {
+    case IMM:
+      nextInt32(arg);
+      break;
+    case STK:
+      arg._i32 = m_stack.pop();
+      break;
+    case ABS:
+      nextInt32(arg);
+      readInt32(arg, arg._i32);
+      break;
+    case PRO:
+      nextInt32(arg);
+      readInt32(arg, m_ip + arg._i32 - 4);
+      break;
+    case NRO:
+      nextInt32(arg);
+      readInt32(arg, m_ip - arg._i32 - 4);
+      break;
+    default:
+      arg._i32 = 0;
+      break;
+  }
+}
+
+void xvm::VM::readArgs(abi::N32* args, const abi::AddressingMode mode[2]) {
+  using namespace xvm::abi;
+
+  for (int i = 0; i < 2; i++) {
+    // readArg(args[i], mode[i]);
+    readAddr(args[i], mode[i]);
+  }
+}
+
+void xvm::VM::readArgNoImm(abi::N32& value, const abi::AddressingMode mode) {
+  using namespace xvm::abi;
+
+  if (mode == ABS) {
+    nextInt32(value);
+    readInt32(value, value._i32);
+  } else if (mode == STK) {
+    value._i32 = m_stack.pop();
+  } /* TODO: Error Handling */
+}
+
+void xvm::VM::readAddr(abi::N32& value, const abi::AddressingMode mode) {
+  using namespace xvm::abi;
+
+  if (mode == IMM) {
+    nextInt32(value);
+  } else if (mode == ABS) {
+    nextInt32(value);
+  } else if (mode == PRO) {
+    nextInt32(value);
+    value._i32 = m_ip + value._i32 - 4; // -4 - rewind argument length
+  } else if (mode == NRO) {
+    nextInt32(value);
+    value._i32 = m_ip - value._i32 - 4; // 
+  } else if (mode == STK) {
+    value._i32 = m_stack.pop();
+  }
 }
 
 void xvm::VM::pushCall(CallStackType value) {

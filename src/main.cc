@@ -3,9 +3,9 @@
 #include <xvm/log.h>
 #include <xvm/utils.h>
 #include <xvm/config.h>
-#include <xvm/binary.h>
 #include <xvm/version.h>
 #include <xvm/assembler.h>
+#include <xvm/executable.h>
 
 #include <iostream>
 #include <fstream>
@@ -27,6 +27,8 @@ static void printHelp(const char* argv0) {
   printf("  run FILE      - Runs compiled file\n");
   printf("  runsrc FILE   - Runs source file direclty (without saving binary)\n");
   printf("  dump FILE     - Dumps info about compiled file\n");
+  // link
+  // dump-section
   printf("Options:\n");
   printf("  -s, --setopt OPTION=VALUE - Sets option\n");
   printf("  -o, --output FILE         - Sets output file\n");
@@ -46,7 +48,7 @@ static int compile(const std::string& filename, const std::string& output, std::
   assembler.setIncludeFolders(includes);
 
   xvm::Executable exe;
-  if (int ret = assembler.assemble(exe, xvm::config::getBool("include-symbols"))) {
+  if (int ret = assembler.assemble(exe, xvm::config::asBool("include-symbols"))) {
     xvm::error("Error assembling '%s' (ret=%d)", filename.c_str(), ret);
     return 1;
   }
@@ -58,9 +60,9 @@ static int compile(const std::string& filename, const std::string& output, std::
 
   auto& code = exe.getSection("code");
 
-  if (xvm::config::getBool("disasm")) {
+  if (xvm::config::asBool("disasm")) {
     printf("=== Disassembly ===\n");
-    if (xvm::config::getBool("fancy-disasm")) {
+    if (xvm::config::asBool("fancy-disasm")) {
       exe.disassemble();
     } else {
       for (int i = 0; i < code.data.size(); ) {
@@ -69,7 +71,7 @@ static int compile(const std::string& filename, const std::string& output, std::
     }
   }
 
-  if (xvm::config::getBool("hexdump")) {
+  if (xvm::config::asBool("hexdump")) {
     printf("=== Hexdump ===\n");
     auto bytes = exe.toBytes();
     xvm::abi::hexdump(bytes.data(), bytes.size());
@@ -100,15 +102,21 @@ static int run(const std::string& filename) {
 
   auto& code = exe.getSection("code");
 
-  if (xvm::config::getBool("hexdump")) {
+  if (xvm::config::asBool("hexdump")) {
     printf("=== Hexdump ===\n");
     auto bytes = exe.toBytes();
     xvm::abi::hexdump(bytes.data(), bytes.size());
   }
 
-  if (xvm::config::getBool("disasm")) {
+  if (xvm::config::asBool("print-symbol-table") && exe.hasSection("symbols")) {
+    printf("=== Symbols ===\n");
+    auto table = xvm::SymbolTable::fromSection(exe.getSection("symbols"));
+    xvm::printTable(xvm::SymbolTable::Symbol::getFieldNames(), table.symbols);
+  }
+
+  if (xvm::config::asBool("disasm")) {
     printf("=== Disassembly ===\n");
-    if (xvm::config::getBool("fancy-disasm")) {
+    if (xvm::config::asBool("fancy-disasm")) {
       exe.disassemble();
     } else {
       for (int i = 0; i < code.data.size(); ) {
@@ -117,14 +125,14 @@ static int run(const std::string& filename) {
     }
   }
 
-  xvm::VM vm(xvm::config::getInt("ram_size"));
+  xvm::VM vm(xvm::config::asInt("ram-size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
   
   if (exe.hasSection("symbols")) {
     vm.loadSymbols(xvm::SymbolTable::fromSection(exe.getSection("symbols")));
   }
 
-  if (xvm::config::getInt("debug") > 0) {
+  if (xvm::config::asInt("debug") > 0) {
     printf("=== Execution Traces ===\n");
   }
 
@@ -146,7 +154,7 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
   assembler.setIncludeFolders(includes);
 
   xvm::Executable exe;
-  if (int ret = assembler.assemble(exe, xvm::config::getBool("include-symbols"))) {
+  if (int ret = assembler.assemble(exe, xvm::config::asBool("include-symbols"))) {
     xvm::error("Error assembling '%s' (ret=%d)", filename.c_str(), ret);
     return -1;
   }
@@ -158,15 +166,21 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
 
   auto& code = exe.getSection("code");
 
-  if (xvm::config::getBool("hexdump")) {
+  if (xvm::config::asBool("hexdump")) {
     printf("=== Hexdump ===\n");
     auto bytes = exe.toBytes();
     xvm::abi::hexdump(bytes.data(), bytes.size());
   }
 
-  if (xvm::config::getBool("disasm")) {
+  if (xvm::config::asBool("print-symbol-table") && exe.hasSection("symbols")) {
+    printf("=== Symbols ===\n");
+    auto table = xvm::SymbolTable::fromSection(exe.getSection("symbols"));
+    xvm::printTable(xvm::SymbolTable::Symbol::getFieldNames(), table.symbols);
+  }
+
+  if (xvm::config::asBool("disasm")) {
     printf("=== Disassembly ===\n");
-    if (xvm::config::getBool("fancy-disasm")) {
+    if (xvm::config::asBool("fancy-disasm")) {
       exe.disassemble();
     } else {
       for (int i = 0; i < code.data.size(); ) {
@@ -175,14 +189,14 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
     }
   }
 
-  xvm::VM vm(xvm::config::getInt("ram_size"));
+  xvm::VM vm(xvm::config::asInt("ram-size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
 
   if (exe.hasSection("symbols")) {
     vm.loadSymbols(xvm::SymbolTable::fromSection(exe.getSection("symbols")));
   }
 
-  if (xvm::config::getInt("debug") > 0) {
+  if (xvm::config::asInt("debug") > 0) {
     printf("=== Execution Traces ===\n");
   }
 
@@ -220,13 +234,13 @@ static int dump(const std::string& filename) {
   for (auto& section : exe.sections) {
     printf("\nSection '%s'\n", section.label.c_str());
 
-    if (xvm::config::getBool("hexdump")) {
+    if (xvm::config::asBool("hexdump")) {
       auto bytes = section.toBytes();
       xvm::abi::hexdump(bytes.data(), bytes.size());
     }
 
     if (section.type == xvm::SectionType::CODE) {
-      if (xvm::config::getBool("fancy-disasm")) {
+      if (xvm::config::asBool("fancy-disasm")) {
         exe.disassemble();
       } else {
         for (int i = 0; i < section.data.size(); ) {
@@ -244,6 +258,34 @@ static int dump(const std::string& filename) {
       xvm::abi::hexdump(section.data.data(), section.data.size());
     }
   }
+
+  return 0;
+}
+
+#include <xvm/bytecode.h>
+
+int test() {
+  // uint32_t m = XVM_MULTICHAR4('X', 'V', 'M', 'E');
+
+  // printf("magic='%.4s'\n", (char*)&m);
+
+  xvm::abi::N32 n;
+  n._i8[0] = 'X';
+  n._i8[1] = 'V';
+  n._i8[2] = 'M';
+  n._i8[3] = 'E';
+
+  printf("magic=%x\n", n._u32);
+  printf("magic='%.4s'\n", (char*)&n);
+  printf("magic='%c%c%c%c'\n", n._u8[0], n._u8[1], n._u8[2], n._u8[3]);
+
+  printf("opcode=0x%x mode1=0x%x mode2=0x%x\n", xvm::abi::ADD, xvm::abi::STK, xvm::abi::ABS);
+  auto i = xvm::abi::encodeInstruction(xvm::abi::STK, xvm::abi::ABS, xvm::abi::ADD);
+  printf("encoded=0x%x\n", i);
+  xvm::abi::AddressingMode mode1, mode2;
+  xvm::abi::OpCode opcode;
+  xvm::abi::decodeIntstruction(i, mode1, mode2, opcode);
+  printf("decoded op=0x%x mode1=0x%x mode1=0x%x\n", opcode, mode1, mode2);
 
   return 0;
 }
@@ -270,7 +312,7 @@ int main(int argc, char ** argv) {
         return -1;
       }
       std::string key = setopt.substr(0, idx), value = setopt.substr(idx+1);
-      xvm::config::setFromString(key, value);
+      xvm::config::set(key, value);
     } else if (!strcmp("-o", argv[i]) || !strcmp("--output", argv[i])) {
       outputFilename = argv[++i];
     } else if (!strcmp("-i", argv[i]) || !strcmp("--include", argv[i])) {
@@ -298,6 +340,8 @@ int main(int argc, char ** argv) {
     printHelp(argv[0]);
   } else if (command == "version") {
     printVersion();
+  } else if (command == "test") { // DEBUG
+    test();
   } else if (command == "compile") {
     return compile(inputFilename, outputFilename, includeFolders);
   } else if (command == "run") {

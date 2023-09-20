@@ -1,4 +1,4 @@
-#include <xvm/binary.h>
+#include <xvm/executable.h>
 #include <xvm/bytecode.h>
 #include <xvm/config.h>
 #include <xvm/log.h>
@@ -8,17 +8,22 @@
 #include <cctype>
 #include <errno.h>
 
+
+xvm::Executable::Section::Section(SectionType type, std::string label, std::vector<u8> data, u32 addr)
+  : magic(XVM_SECTION_MAGIC), type(type), addr(addr), checksum(0), label(label), data(data) {
+}
+
 size_t xvm::Executable::Section::size() const {
   return label.size() + data.size() + 12;
 }
 
-std::vector<uint8_t> xvm::Executable::Section::toBytes() const {
-  std::vector<uint8_t> buffer;
+std::vector<u8> xvm::Executable::Section::toBytes() const {
+  std::vector<u8> buffer;
   abi::N32 n;
 
   auto push_u32 = [&n, &buffer] {
     for (int i = 0; i < 4; i++)
-      buffer.push_back(n.u8[i]);
+      buffer.push_back(n._u8[i]);
   };
 
   for (char c : label) {
@@ -26,13 +31,13 @@ std::vector<uint8_t> xvm::Executable::Section::toBytes() const {
   }
   buffer.push_back(0);
 
-  n.u32 = (uint32_t) type;
+  n._u32 = (u32) type;
   push_u32();
 
-  n.u32 = data.size();
+  n._u32 = data.size();
   push_u32();
 
-  n.u32 = checksum;
+  n._u32 = checksum;
   push_u32();
 
   buffer.insert(buffer.end(), data.begin(), data.end());
@@ -40,7 +45,7 @@ std::vector<uint8_t> xvm::Executable::Section::toBytes() const {
   return buffer;
 }
 
-xvm::Executable::Section xvm::Executable::Section::fromBuffer(const uint8_t* data, size_t offset) {
+xvm::Executable::Section xvm::Executable::Section::fromBuffer(const u8* data, size_t offset) {
   Section section;
 
   for (char c = data[offset++]; c != '\0'; c = data[offset++]) {
@@ -49,13 +54,13 @@ xvm::Executable::Section xvm::Executable::Section::fromBuffer(const uint8_t* dat
 
   abi::N32 n;
   readInt32(n, data, offset);
-  section.type = (SectionType) n.u32;
+  section.type = (SectionType) n._u32;
 
   readInt32(n, data, offset += 4);
-  uint32_t size = n.u32;
+  u32 size = n._u32;
 
   readInt32(n, data, offset += 4);
-  section.checksum = n.u32;
+  section.checksum = n._u32;
 
   offset += 4;
 
@@ -73,15 +78,15 @@ const std::vector<std::string> xvm::Executable::Section::getFieldNames() {
 }
 
 bool xvm::SymbolTable::Symbol::isLabel() const {
-  return flags & (uint16_t) SymbolFlags::LABEL;
+  return flags & (u16) SymbolFlags::LABEL;
 }
 
 bool xvm::SymbolTable::Symbol::isProcedure() const {
-  return flags & (uint16_t) SymbolFlags::PROCEDURE;
+  return flags & (u16) SymbolFlags::PROCEDURE;
 }
 
 bool xvm::SymbolTable::Symbol::isVariable() const {
-  return flags & (uint16_t) SymbolFlags::VARIABLE;
+  return flags & (u16) SymbolFlags::VARIABLE;
 }
 
 std::vector<std::string> xvm::SymbolTable::Symbol::getStringLine() const {
@@ -100,11 +105,11 @@ const std::vector<std::string> xvm::SymbolTable::Symbol::getFieldNames() {
   return {"Addr", "Flags", "Size", "Label"};
 }
 
-void xvm::SymbolTable::addSymbol(uint32_t address, const std::string& label, uint16_t flags, uint16_t size) {
+void xvm::SymbolTable::addSymbol(u32 address, const std::string& label, u16 flags, u16 size) {
   symbols.push_back({address, flags, size, label});
 }
 
-xvm::SymbolTable::Symbol& xvm::SymbolTable::getByAddress(uint32_t address) {
+xvm::SymbolTable::Symbol& xvm::SymbolTable::getByAddress(u32 address) {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return symbol;
@@ -122,7 +127,7 @@ xvm::SymbolTable::Symbol& xvm::SymbolTable::getByLabel(const std::string& label)
   throw "No such symbol";
 }
 
-bool xvm::SymbolTable::hasAddress(uint32_t address) const {
+bool xvm::SymbolTable::hasAddress(u32 address) const {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return true;
@@ -149,17 +154,17 @@ xvm::Executable::Section xvm::SymbolTable::toSection(const std::string& label) c
   section.checksum = 0;
 
   for (auto& symbol : symbols) {
-    n.i32 = symbol.address;
+    n._i32 = symbol.address;
     for (int i = 0; i < 4; i++)
-      section.data.push_back(n.u8[i]);
+      section.data.push_back(n._u8[i]);
 
-    n.u16[0] = symbol.flags;
-    section.data.push_back(n.u8[0]);
-    section.data.push_back(n.u8[1]);
+    n._u16[0] = symbol.flags;
+    section.data.push_back(n._u8[0]);
+    section.data.push_back(n._u8[1]);
 
-    n.u16[0] = symbol.size;
-    section.data.push_back(n.u8[0]);
-    section.data.push_back(n.u8[1]);
+    n._u16[0] = symbol.size;
+    section.data.push_back(n._u8[0]);
+    section.data.push_back(n._u8[1]);
 
     for (int i = 0; i < symbol.label.size(); i++)
       section.data.push_back(symbol.label[i]);
@@ -177,13 +182,13 @@ xvm::SymbolTable xvm::SymbolTable::fromSection(const Executable::Section& sectio
     Symbol symbol;
 
     readInt32(n, section.data.data(), i);
-    symbol.address = n.u32;
+    symbol.address = n._u32;
 
     readInt16(n, section.data.data(), i += 4);
-    symbol.flags = n.u16[0];
+    symbol.flags = n._u16[0];
 
     readInt16(n, section.data.data(), i += 2);
-    symbol.size = n.u16[0];
+    symbol.size = n._u16[0];
 
     i += 2;
 
@@ -257,25 +262,25 @@ void xvm::Executable::disassemble() const {
   }
 }
 
-std::vector<uint8_t> xvm::Executable::toBytes() const {
-  std::vector<uint8_t> buffer;
+std::vector<u8> xvm::Executable::toBytes() const {
+  std::vector<u8> buffer;
   abi::N32 n;
 
   auto push_u32 = [&n, &buffer] {
     for (int i = 0; i < 4; i++)
-      buffer.push_back(n.u8[i]);
+      buffer.push_back(n._u8[i]);
   };
 
-  n.u32 = magic;
+  n._u32 = magic;
   push_u32();
 
-  n.u32 = version;
+  n._u32 = version;
   push_u32();
 
-  n.u32 = flags;
+  n._u32 = flags;
   push_u32();
 
-  n.u32 = sections.size();
+  n._u32 = sections.size();
   push_u32();
 
   for (auto& section : sections) {
@@ -300,25 +305,25 @@ void xvm::Executable::toFile(const std::string& filename) const {
   fclose(file);
 }
 
-xvm::Executable xvm::Executable::fromBuffer(const uint8_t* data) {
+xvm::Executable xvm::Executable::fromBuffer(const u8* data) {
   Executable exe;
   
   abi::N32 n;
   readInt32(n, data, 0);
-  exe.magic = n.u32;
+  exe.magic = n._u32;
 
   readInt32(n, data, 4);
-  exe.version = n.u32;
+  exe.version = n._u32;
 
   readInt32(n, data, 8);
-  exe.flags = n.u32;
+  exe.flags = n._u32;
   
   readInt32(n, data, 12);
-  uint32_t section_count = n.u32;
+  u32 section_count = n._u32;
 
-  uint32_t offset = 16;
+  u32 offset = 16;
 
-  for (uint32_t i = 0; i < section_count; i++) {
+  for (u32 i = 0; i < section_count; i++) {
     exe.sections.push_back(Section::fromBuffer(data, offset));
     offset += exe.sections.back().size() + 1;
   }
@@ -343,7 +348,7 @@ xvm::Executable xvm::Executable::fromFile(const std::string& filename) {
   size_t size = ftell(file);
   rewind(file);
 
-  uint8_t* data = new uint8_t[size];
+  u8* data = new u8[size];
   if (fread(data, 1, size, file) != size) {
     error("Error: couldn't read file (errno=%d)", errno);
     delete [] data;

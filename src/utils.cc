@@ -53,7 +53,11 @@ void xvm::printTable(const std::vector<std::string>& fields, std::vector<std::ve
     std::vector<size_t> columns;
     std::transform(lines.begin(), lines.end(), std::back_inserter(columns),
       [&i](const std::vector<std::string>& line) { return line[i].size(); });
-    lengths[i] = std::max(*std::max_element(columns.begin(), columns.end()), fields[i].size());
+    if (columns.empty()) {
+      lengths[i] = fields[i].size();
+    } else {
+      lengths[i] = std::max(*std::max_element(columns.begin(), columns.end()), fields[i].size());
+    }
   }
 
   printTableBorder(lengths);

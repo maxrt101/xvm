@@ -126,17 +126,20 @@ int xvm::Assembler::assemble(Executable& exe, bool includeSymbols) {
   exe.magic = XVM_MAGIC;
   exe.version = XVM_VERSION_CODE;
 
-  exe.sections.push_back(Executable::Section {
-    "code",
+  exe.sections.push_back(Executable::Section(
     SectionType::CODE,
-    0,
-    m_code
-  });
+    "code",
+    m_code,
+    0
+  ));
 
   if (includeSymbols) {
     SymbolTable table;
 
     for (auto& label : m_labels) {
+      if (!m_exportAll && std::find(m_exported.begin(), m_exported.end(), label.first) == m_exported.end()) {
+        continue;
+      }
       int size = 0;
       uint16_t flags = 0;
       if (m_variables.find(label.first) != m_variables.end()) {
@@ -447,6 +450,11 @@ void xvm::Assembler::tokenize() {
         m_current++;
         break;
       }
+      case '*': {
+        m_tokens.push_back(Token(TokenType::STAR, m_start, 1, m_line));
+        m_current++;
+        break;
+      }
       case '\'': {
         m_tokens.push_back(character());
         m_current++;
@@ -468,8 +476,9 @@ void xvm::Assembler::tokenize() {
   m_tokens.push_back(Token(TokenType::IDENTIFIER, g_eof, m_tokens.back().line+1));
 }
 
-void xvm::Assembler::pushOpcode(abi::AddressingMode mode, abi::OpCode opcode) {
-  m_code.push_back(abi::encodeInstruction(mode, opcode));
+void xvm::Assembler::pushOpcode(abi::OpCode opcode, abi::AddressingMode mode1, abi::AddressingMode mode2) {
+  pushByte(abi::encodeFlags(mode1, mode2));
+  pushByte(opcode);
 }
 
 void xvm::Assembler::pushByte(uint8_t value) {
@@ -478,21 +487,21 @@ void xvm::Assembler::pushByte(uint8_t value) {
 
 void xvm::Assembler::pushInt16(int16_t value) {
   abi::N32 number;
-  number.i16[0] = value;
-  m_code.push_back(number.u8[0]);
-  m_code.push_back(number.u8[1]);
+  number._i16[0] = value;
+  pushByte(number._u8[0]);
+  pushByte(number._u8[1]);
 }
 
 void xvm::Assembler::pushInt32(int32_t value) {
   abi::N32 number;
-  number.i32 = value;
-  m_code.push_back(number.u8[0]);
-  m_code.push_back(number.u8[1]);
-  m_code.push_back(number.u8[2]);
-  m_code.push_back(number.u8[3]);
+  number._i32 = value;
+  pushByte(number._u8[0]);
+  pushByte(number._u8[1]);
+  pushByte(number._u8[2]);
+  pushByte(number._u8[3]);
 }
 
-int32_t xvm::Assembler::getAddress() {
+int32_t xvm::Assembler::getAddress(u8 argumentNumber) {
   Token token = getNextToken();
   if (token.type == TokenType::NUMBER) {
     return token.toNumber();
@@ -503,15 +512,15 @@ int32_t xvm::Assembler::getAddress() {
       return m_tokens[m_index].toNumber();
     }
   } else if (token.type == TokenType::IDENTIFIER) {
-    m_labels[token.str].mentions.push_back({static_cast<int32_t>(m_code.size())});
+    m_labels[token.str].mentions.push_back({static_cast<int32_t>(m_code.size()), argumentNumber});
     int32_t addressOffset = 0;
     Token nextToken = m_tokens[m_index+1];
     if (nextToken.type == TokenType::PLUS) {
       m_index++;
-      addressOffset += getAddress();
+      addressOffset += getAddress(0);
     } else if (nextToken.type == TokenType::MINUS) {
       m_index++;
-      addressOffset -= getAddress();
+      addressOffset -= getAddress(0);
     }
     return addressOffset;
   } else {
@@ -531,11 +540,16 @@ void xvm::Assembler::patchLabels() { // TODO: check for unpatched labels
         m_hadError = true;
       }
       N32 value;
-      value.i32 = label.second.address;
-      m_code[mention.address]   += value.u8[0];
-      m_code[mention.address+1] += value.u8[1];
-      m_code[mention.address+2] += value.u8[2];
-      m_code[mention.address+3] += value.u8[3];
+      if (config::asBool("pic")) {
+        patchAddressingMode(label.second.address, mention.address, mention.argumentNumber);
+        value._i32 = std::abs(label.second.address - mention.address);
+      } else {
+        value._i32 = label.second.address;
+      }
+      m_code[mention.address]   += value._u8[0];
+      m_code[mention.address+1] += value._u8[1];
+      m_code[mention.address+2] += value._u8[2];
+      m_code[mention.address+3] += value._u8[3];
       debug(2, "Label '%s' mention at 0x%x patched", label.first.c_str(), mention.address);
     }
   }
@@ -573,16 +587,40 @@ void xvm::Assembler::patchVariables() {
             return;
           }
         }
-        m_code[mention.address] = encodeInstruction(STK, op);
+        m_code[mention.address]   = encodeFlags(STK, _NONE); //encodeInstruction(STK, _NONE, op);
+        m_code[mention.address+1] = op; 
         debug(2, "Variable '%s' deref mention at 0x%x patched with %s", var.first.c_str(), mention.address, opCodeToString(op).c_str());
       } else {
-        value.i32 = var.second.address;
-        m_code[mention.address]   += value.u8[0];
-        m_code[mention.address+1] += value.u8[1];
-        m_code[mention.address+2] += value.u8[2];
-        m_code[mention.address+3] += value.u8[3];
+        value._i32 = var.second.address;
+        m_code[mention.address]   += value._u8[0];
+        m_code[mention.address+1] += value._u8[1];
+        m_code[mention.address+2] += value._u8[2];
+        m_code[mention.address+3] += value._u8[3];
         debug(2, "Variable '%s' mention at 0x%x patched", var.first.c_str());
       }
+    }
+  }
+}
+
+void xvm::Assembler::patchAddressingMode(i32 labelAddress, i32 mentionAddress, u8 argumentNumber) {
+  using namespace abi;
+  if (labelAddress - mentionAddress < 0) {
+    // NRO
+    if (argumentNumber == 1) {
+      auto mode2 = extractModeArg2(m_code[mentionAddress - 2]);
+      m_code[mentionAddress - 2] = encodeFlags(NRO, mode2);
+    } else if (argumentNumber == 2) {
+      auto mode1 = extractModeArg1(m_code[mentionAddress - 6]);
+      m_code[mentionAddress - 6] = encodeFlags(mode1, NRO);
+    }
+  } else {
+    // PRO
+    if (argumentNumber == 1) {
+      auto mode2 = extractModeArg2(m_code[mentionAddress - 2]);
+      m_code[mentionAddress - 2] = encodeFlags(PRO, mode2);
+    } else if (argumentNumber == 2) {
+      auto mode1 = extractModeArg1(m_code[mentionAddress - 6]);
+      m_code[mentionAddress - 6] = encodeFlags(mode1, PRO);
     }
   }
 }
@@ -593,9 +631,9 @@ void xvm::Assembler::parse() {
   for (m_index = 0; m_index < m_tokens.size()-1; m_index++) {
     if (m_tokens[m_index].type == TokenType::IDENTIFIER) {
       if (m_tokens[m_index] == "halt") {
-        pushOpcode(STK, HALT);
+        pushOpcode(HALT, _NONE, _NONE);
       } else if (m_tokens[m_index] == "push") {
-        pushOpcode(IMM1, PUSH);
+        pushOpcode(PUSH, IMM);
         if (m_tokens[m_index+1].type == TokenType::DOLLAR) {
           m_index++;
           if (m_tokens[m_index+1].type != TokenType::IDENTIFIER) {
@@ -606,285 +644,304 @@ void xvm::Assembler::parse() {
           if (m_variables.find(varname) == m_variables.end()) {
             m_variables[varname] = {};
           }
-          m_variables[varname].mentions.push_back({static_cast<int32_t>(m_code.size()), true});
-          pushOpcode(STK, NOP);
+          m_variables[varname].mentions.push_back({static_cast<int32_t>(m_code.size()), 1, true});
+          // pushOpcode(NOP, _NONE);
+          pushInt32(0);
         } else {
           pushInt32(getAddress());
         }
       } else if (m_tokens[m_index] == "pop") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, POP);
+          pushOpcode(POP, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, POP);
+          pushOpcode(POP, _NONE);
         }
       } else if (m_tokens[m_index] == "dup") {
-        pushOpcode(STK, DUP);
+        pushOpcode(DUP, _NONE);
       } else if (m_tokens[m_index] == "rol") {
-        pushOpcode(STK, ROL);
+        pushOpcode(ROL, _NONE);
       } else if (m_tokens[m_index] == "rol3") {
-        pushOpcode(STK, ROL3);
+        pushOpcode(ROL3, _NONE);
       } else if (m_tokens[m_index] == "deref8") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, DEREF8);
+          pushOpcode(DEREF8, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, DEREF8);
+          pushOpcode(DEREF8, STK);
         }
       } else if (m_tokens[m_index] == "deref16") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, DEREF16);
+          pushOpcode(DEREF16, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, DEREF16);
+          pushOpcode(DEREF16, STK);
         }
       } else if (m_tokens[m_index] == "deref32") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, DEREF32);
+          pushOpcode(DEREF32, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, DEREF32);
+          pushOpcode(DEREF32, STK);
         }
       } else if (m_tokens[m_index] == "store8") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, STORE8);
-          pushInt32(getAddress());
+          if (isNextTokenOnSameLine()) {
+            pushOpcode(STORE8, IMM, IMM);
+            pushInt32(getAddress());
+            pushInt32(getAddress());
+          } else {
+            pushOpcode(STORE8, IMM, STK);
+            pushInt32(getAddress());
+          }
         } else {
-          pushOpcode(STK, STORE8);
+          pushOpcode(STORE8, STK, STK);
         }
       } else if (m_tokens[m_index] == "store16") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, STORE16);
-          pushInt32(getAddress());
+          if (isNextTokenOnSameLine()) {
+            pushOpcode(STORE16, IMM, IMM);
+            pushInt32(getAddress());
+            pushInt32(getAddress());
+          } else {
+            pushOpcode(STORE16, IMM, STK);
+            pushInt32(getAddress());
+          }
         } else {
-          pushOpcode(STK, STORE16);
+          pushOpcode(STORE16, STK, STK);
         }
       } else if (m_tokens[m_index] == "store32") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, STORE32);
-          pushInt32(getAddress());
+          if (isNextTokenOnSameLine()) {
+            pushOpcode(STORE32, IMM, IMM);
+            pushInt32(getAddress());
+            pushInt32(getAddress());
+          } else {
+            pushOpcode(STORE32, IMM, STK);
+            pushInt32(getAddress());
+          }
         } else {
-          pushOpcode(STK, STORE32);
+          pushOpcode(STORE32, STK, STK);
         }
       } else if (m_tokens[m_index] == "load8") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, LOAD8);
+          pushOpcode(LOAD8, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, LOAD8);
+          pushOpcode(LOAD8, STK);
         }
       } else if (m_tokens[m_index] == "load16") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, LOAD16);
+          pushOpcode(LOAD16, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, LOAD16);
+          pushOpcode(LOAD16, STK);
         }
       } else if (m_tokens[m_index] == "load32") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, LOAD32);
+          pushOpcode(LOAD32, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, LOAD32);
+          pushOpcode(LOAD32, STK);
         }
       } else if (m_tokens[m_index] == "add") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, ADD);
+            int32_t op2 = getAddress(2);
+            pushOpcode(ADD, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, ADD);
+            pushOpcode(ADD, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, ADD);
+          pushOpcode(ADD, STK, STK);
         }
       } else if (m_tokens[m_index] == "sub") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, SUB);
+            int32_t op2 = getAddress(2);
+            pushOpcode(SUB, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, SUB);
+            pushOpcode(SUB, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, SUB);
+          pushOpcode(SUB, STK, STK);
         }
       } else if (m_tokens[m_index] == "mul") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, MUL);
+            int32_t op2 = getAddress(2);
+            pushOpcode(MUL, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, MUL);
+            pushOpcode(MUL, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, MUL);
+          pushOpcode(MUL, STK, STK);
         }
       } else if (m_tokens[m_index] == "div") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, DIV);
+            int32_t op2 = getAddress(2);
+            pushOpcode(DIV, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, DIV);
+            pushOpcode(DIV, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, DIV);
+          pushOpcode(DIV, STK, STK);
         }
       } else if (m_tokens[m_index] == "equ") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, EQU);
+            int32_t op2 = getAddress(2);
+            pushOpcode(EQU, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, EQU);
+            pushOpcode(EQU, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, EQU);
+          pushOpcode(EQU, STK, STK);
         }
       } else if (m_tokens[m_index] == "gt") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, GT);
+            int32_t op2 = getAddress(2);
+            pushOpcode(GT, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, GT);
+            pushOpcode(GT, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, GT);
+          pushOpcode(GT, STK, STK);
         }
       } else if (m_tokens[m_index] == "lt") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, LT);
+            int32_t op2 = getAddress(2);
+            pushOpcode(LT, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, LT);
+            pushOpcode(LT, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, LT);
+          pushOpcode(LT, STK, STK);
         }
       } else if (m_tokens[m_index] == "dec") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IND, DEC);
+          pushOpcode(DEC, ABS); // FIXME:
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, DEC);
+          pushOpcode(DEC, STK);
         }
       } else if (m_tokens[m_index] == "inc") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IND, INC);
+          pushOpcode(INC, ABS); // FIXME:
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, INC);
+          pushOpcode(INC, STK);
         }
       } else if (m_tokens[m_index] == "shl") {
         if (!isNextTokenOnSameLine()) {
           asmError("Expected shift number");
           return;
         }
-        pushOpcode(STK, SHL);
+        pushOpcode(SHL, STK);
         pushInt32(getAddress()); // TODO: getInt
       } else if (m_tokens[m_index] == "shr") {
         if (!isNextTokenOnSameLine()) {
           asmError("Expected shift number");
           return;
         }
-        pushOpcode(STK, SHR);
+        pushOpcode(SHR, STK);
         pushInt32(getAddress()); // TODO: getInt
       } else if (m_tokens[m_index] == "and") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, AND);
+            int32_t op2 = getAddress(2);
+            pushOpcode(AND, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, AND);
+            pushOpcode(AND, IMM, STK);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, AND);
+          pushOpcode(AND, STK, STK);
         }
       } else if (m_tokens[m_index] == "or") {
         if (isNextTokenOnSameLine()) {
           int32_t op1 = getAddress();
           if (isNextTokenOnSameLine()) {
-            int32_t op2 = getAddress();
-            pushOpcode(IMM2, OR);
+            int32_t op2 = getAddress(2);
+            pushOpcode(OR, IMM, IMM);
             pushInt32(op1);
             pushInt32(op2);
           } else {
-            pushOpcode(IMM1, OR);
+            pushOpcode(OR, IMM);
             pushInt32(op1);
           }
         } else {
-          pushOpcode(STK, OR);
+          pushOpcode(OR, STK, STK);
         }
       } else if (m_tokens[m_index] == "jump") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, JUMP);
+          pushOpcode(JUMP, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, JUMP);
+          pushOpcode(JUMP, STK);
         }
       } else if (m_tokens[m_index] == "jumpt") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, JUMPT);
+          pushOpcode(JUMPT, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, JUMPT);
+          pushOpcode(JUMPT, STK);
         }
       } else if (m_tokens[m_index] == "jumpf") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, JUMPF);
+          pushOpcode(JUMPF, IMM);
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, JUMPF);
+          pushOpcode(JUMPF, STK);
         }
       } else if (m_tokens[m_index] == "call") {
         if (isNextTokenOnSameLine()) {
-          pushOpcode(IMM1, CALL);
+          pushOpcode(CALL, IMM);
           if (m_tokens[m_index+1].type == TokenType::IDENTIFIER) {
             m_labels[m_tokens[m_index+1].str].isProcedure = true;
           }
           pushInt32(getAddress());
         } else {
-          pushOpcode(STK, CALL);
+          pushOpcode(CALL, STK);
         }
       } else if (m_tokens[m_index] == "syscall") {
         if (isNextTokenOnSameLine()) {
           // pushInt32(getAddress()); // TODO: getInt
-          pushOpcode(IMM1, SYSCALL);
+          pushOpcode(SYSCALL, IMM);
           Token token = m_tokens[++m_index];
           if (token.type == TokenType::NUMBER) {
             pushInt32(token.toNumber());
@@ -899,10 +956,10 @@ void xvm::Assembler::parse() {
             return;
           }
         } else {
-          pushOpcode(STK, SYSCALL);
+          pushOpcode(SYSCALL, STK);
         }
       } else if (m_tokens[m_index] == "ret") {
-        pushOpcode(STK, RET);
+        pushOpcode(RET, _NONE);
       } else {
         if (m_tokens[m_index+1].type == TokenType::COLON) {
           m_labels[m_tokens[m_index].str].address = m_code.size();
@@ -1099,6 +1156,30 @@ void xvm::Assembler::parse() {
           m_variables[name.str].address = m_labels[name.str].address;
           m_variables[name.str].type = Variable::stringToType(type.str);
           m_variables[name.str].count = count;
+        } else if (m_tokens[m_index] == "export") {
+          while (isNextTokenOnSameLine()) {
+            Token exportName = getNextToken();
+            if (exportName.str == "*") {
+              m_exportAll = true;
+            } else {
+              m_exported.push_back(exportName.str);
+            }
+          }
+        } else if (m_tokens[m_index] == "unexport") {
+          while (isNextTokenOnSameLine()) {
+            Token exportName = getNextToken();
+            if (exportName.str == "*") {
+              m_exportAll = false;
+            } else {
+              auto itr = std::find(m_exported.begin(), m_exported.end(), exportName.str);
+              if (itr != m_exported.end()) {
+                m_exported.erase(itr);
+              }
+            }
+          }
+        } else {
+          asmError("Unknown directive '%s'", m_tokens[m_index].str.c_str());
+          return;
         }
 
       }
