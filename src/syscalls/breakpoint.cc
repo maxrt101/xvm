@@ -122,16 +122,16 @@ void xvm::sys_breakpoint(VM* vm) {
         vm->getBus().write(addr, value);
       } else if (type == "i16") {
         abi::N32 n;
-        n.i16[0] = value;
-        vm->getBus().write(addr, n.u8[0]);
-        vm->getBus().write(addr+1, n.u8[1]);
+        n._i16[0] = value;
+        vm->getBus().write(addr, n._u8[0]);
+        vm->getBus().write(addr+1, n._u8[1]);
       } else if (type == "i32") {
         abi::N32 n;
-        n.i32 = value;
-        vm->getBus().write(addr, n.u8[0]);
-        vm->getBus().write(addr+1, n.u8[1]);
-        vm->getBus().write(addr+2, n.u8[2]);
-        vm->getBus().write(addr+3, n.u8[3]);
+        n._i32 = value;
+        vm->getBus().write(addr, n._u8[0]);
+        vm->getBus().write(addr+1, n._u8[1]);
+        vm->getBus().write(addr+2, n._u8[2]);
+        vm->getBus().write(addr+3, n._u8[3]);
       } else {
         error("Unknown type");
       }
@@ -140,17 +140,17 @@ void xvm::sys_breakpoint(VM* vm) {
         error("Usage: getopt NAME");
         continue;
       }
-      printf("%s\n", config::getAsString(tokens[1]).c_str());
+      printf("%s\n", config::get(tokens[1]).c_str());
     } else if (tokens[0] == "setopt") {
       if (tokens.size() != 3) {
         error("Usage: getopt NAME VALUE");
         continue;
       }
-      config::setFromString(tokens[1], tokens[2]);
+      config::set(tokens[1], tokens[2]);
     } else if (tokens[0] == "config" || tokens[0] == "conf" || tokens[0] == "cfg") {
       auto keys = config::getKeys();
       for (auto& key : keys) {
-        printf("%s: '%s'\n", key.c_str(), config::getAsString(key).c_str());
+        printf("%s: '%s'\n", key.c_str(), config::get(key).c_str());
       }
     } else if (tokens[0] == "bus") {
       if (tokens.size() > 1) {
@@ -213,16 +213,16 @@ void xvm::sys_breakpoint(VM* vm) {
             printf("0x%x\n", vm->getBus().read(addr));
           } else if (tokens[1] == "i16") {
             abi::N32 n;
-            n.u8[0] = vm->getBus().read(addr);
-            n.u8[1] = vm->getBus().read(addr+1);
-            printf("0x%x\n", n.i16[0]);
+            n._u8[0] = vm->getBus().read(addr);
+            n._u8[1] = vm->getBus().read(addr+1);
+            printf("0x%x\n", n._i16[0]);
           } else if (tokens[1] == "i32") {
             abi::N32 n;
-            n.u8[0] = vm->getBus().read(addr);
-            n.u8[1] = vm->getBus().read(addr+1);
-            n.u8[2] = vm->getBus().read(addr+2);
-            n.u8[3] = vm->getBus().read(addr+3);
-            printf("0x%x\n", n.i32);
+            n._u8[0] = vm->getBus().read(addr);
+            n._u8[1] = vm->getBus().read(addr+1);
+            n._u8[2] = vm->getBus().read(addr+2);
+            n._u8[3] = vm->getBus().read(addr+3);
+            printf("0x%x\n", n._i32);
           } else if (tokens[1] == "str") {
             printf("%s\n", utils::busReadString(vm, addr).c_str());
           } else {

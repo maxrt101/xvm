@@ -1,12 +1,14 @@
 #include <xvm/bytecode.h>
-#include <xvm/abi.h>
 
 std::string xvm::abi::addressingModeToString(AddressingMode mode) {
   switch (mode) {
-    case IMM1: return "IMM1";
-    case IMM2: return "IMM2";
-    case IND:  return "IND";
-    case STK:  return "STK";
+    case _NONE: return "   ";
+    case STK:   return "STK";
+    case IMM:   return "IMM";
+    case ABS:   return "ABS";
+    case PRO:   return "PRO";
+    case NRO:   return "NRO";
+    default:    return "<?>";
   }
 }
 
@@ -52,29 +54,43 @@ std::string xvm::abi::opCodeToString(OpCode opcode) {
   }
 }
 
-uint8_t xvm::abi::encodeInstruction(const AddressingMode mode, OpCode opcode) {
-  return ((uint8_t)mode << 6) | (uint8_t)opcode;
+xvm::abi::Intstruction xvm::abi::encodeInstruction(const AddressingMode mode1, const AddressingMode mode2, const OpCode opcode) {
+  return ((u16)((mode1 << 4) | mode2) << 8) | opcode;
 }
 
-xvm::abi::AddressingMode xvm::abi::extractMode(uint8_t byte) {
-  return (AddressingMode)((byte & 0b11000000) >> 6);
+u8 xvm::abi::encodeFlags(const AddressingMode mode1, const AddressingMode mode2) {
+  return (mode1 << 4) | mode2;
 }
 
-xvm::abi::OpCode xvm::abi::extractOpcode(uint8_t byte) {
-  return (OpCode)(byte & 0b00111111);
+xvm::abi::AddressingMode xvm::abi::extractModeArg1(u8 flags) {
+  return (AddressingMode) ((flags >> 4) & 0xf);
 }
+
+xvm::abi::AddressingMode xvm::abi::extractModeArg2(u8 flags) {
+  return (AddressingMode) (flags & 0xf);
+}
+
+void xvm::abi::decodeIntstruction(const Intstruction instruction, AddressingMode& mode1, AddressingMode& mode2, OpCode& opcode) {
+  u8 flags = (instruction >> 8) & 0xff;
+  opcode = (OpCode) (instruction & 0xff);
+  mode1 = extractModeArg1(flags);
+  mode2 = extractModeArg2(flags);
+}
+
 
 int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
-  OpCode opcode = extractOpcode(data[offset]);
-  AddressingMode mode = extractMode(data[offset]);
-  printf("0x%04x | %-8s %-4s ", offset, opCodeToString(opcode).c_str(), addressingModeToString(mode).c_str());
+  AddressingMode mode[] = {
+    extractModeArg1(data[offset]),
+    extractModeArg2(data[offset])
+  };
+  OpCode opcode = (OpCode) data[++offset];
+
+  printf("0x%04x | %-8s %-4s %-4s ", offset,
+    opCodeToString(opcode).c_str(),
+    addressingModeToString(mode[0]).c_str(),
+    addressingModeToString(mode[1]).c_str());
+
   switch (opcode) {
-    case PUSH: {
-      N32 result;
-      readInt32(result, data, offset+1);
-      printf("%d\n", result.i32);
-      return offset+5;
-    }
     case DEREF8:
     case DEREF16:
     case DEREF32:
@@ -84,80 +100,102 @@ int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
     case LOAD8:
     case LOAD16:
     case LOAD32: {
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         N32 result;
         readInt32(result, data, offset+1);
-        printf("%d\n", result.i32);
+        printf("%d\n", result._i32);
         return offset+5;
       }
       printf("\n");
       return offset+1;
     }
+    case PUSH:
     case ADD:
     case SUB:
     case MUL:
     case DIV:
     case EQU:
     case LT:
-    case GT: {
-      if (mode == IMM1) {
+    case GT:
+    case AND:
+    case OR: {
+      for (int i = 0; i < 2; i++) {
         N32 result;
-        readInt32(result, data, offset+1);
-        printf("%d\n", result.i32);
-        return offset+5;
-      } else if (mode == IMM2) {
-        N32 result1, result2;
-        readInt32(result1, data, offset+1);
-        readInt32(result2, data, offset+5);
-        printf("%d %d\n", result1.i32, result2.i32);
-        return offset+9;
+        switch (mode[i]) {
+          case IMM:
+            readInt32(result, data, offset+1);
+            printf("%d\n", result._i32);
+            offset += 5;
+            break;
+          case ABS:
+            readInt32(result, data, offset+1);
+            printf("0x%x", result._i32);
+            offset += 5;
+            break;
+          case PRO:
+            readInt32(result, data, offset+1);
+            printf("0x%x (0x%x)", result._i32, offset + result._i32 + 1);
+            offset += 5;
+            break;
+          case NRO:
+            readInt32(result, data, offset+1);
+            printf("0x%x (0x%x)", result._i32, offset - result._i32 + 1);
+            offset += 5;
+            break;
+          default:
+            break;
+        }
       }
+
       printf("\n");
-      return offset+1;
+      return (opcode == PUSH) ? offset : offset + 1;
     }
     case SHR:
     case SHL: {
       N32 result;
       readInt32(result, data, offset+1);
-      printf("%d\n", result.i32);
+      printf("%d\n", result._i32);
       return offset+5;
-    }
-    case AND:
-    case OR: {
-      if (mode == IMM1) {
-        N32 result;
-        readInt32(result, data, offset+1);
-        printf("%d\n", result.i32);
-        return offset+5;
-      } else if (mode == IMM2) {
-        N32 result1, result2;
-        readInt32(result1, data, offset+1);
-        readInt32(result2, data, offset+5);
-        printf("%d %d\n", result1.i32, result2.i32);
-        return offset+9;
-      }
-      printf("\n");
-      return offset+1;
     }
     case JUMP:
     case JUMPT:
     case JUMPF:
     case CALL: {
-      if (mode == IMM1 || mode == IMM2) {
+      for (int i = 0; i < 2; i++) {
         N32 result;
-        readInt32(result, data, offset+1);
-        // printf("0x%x -> 0x%x", offset, result.i32);
-        printf("0x%x\n", result.i32);
-        return offset+5;
+        switch (mode[i]) {
+          case IMM:
+            readInt32(result, data, offset+1);
+            printf("%d", result._i32);
+            offset += 5;
+            break;
+          case ABS:
+            readInt32(result, data, offset+1);
+            printf("0x%x", result._i32);
+            offset += 5;
+            break;
+          case PRO:
+            readInt32(result, data, offset+1);
+            printf("0x%x (0x%x)", result._i32, offset + result._i32 + 1);
+            offset += 5;
+            break;
+          case NRO:
+            readInt32(result, data, offset+1);
+            printf("0x%x (0x%x)", result._i32, offset - result._i32 + 1);
+            offset += 5;
+            break;
+          default:
+            break;
+        }
       }
       printf("\n");
-      return offset+1;
+      return offset;
     }
     case SYSCALL: { // TODO: ?
-      if (mode == IMM1 || mode == IMM2) {
+      if (mode[0] == IMM) {
         N32 result;
         readInt32(result, data, offset+1);
-        printf("0x%x\n", result.i32); // print syscall name from syscall table
+        printf("0x%x\n", result._i32); // print syscall name from syscall table
         return offset+5;
       }
       printf("\n");

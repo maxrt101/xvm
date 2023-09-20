@@ -141,3 +141,13 @@ stoi:     ; [str]
   ;
   ret
 
+
+dup2:     ; [x, y] -> [x, y, x, y]
+  rol     ; [y, x]
+  dup     ; [y, x, x]
+  rol3    ; [x, x, y]
+  dup     ; [x, x, y, y]
+  rol3    ; [x, y, y, x]
+  rol     ; [x, y, x, y]
+  ret
+

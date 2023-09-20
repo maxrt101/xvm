@@ -3,12 +3,14 @@
 
 #include <cstdint>
 #include <string>
-
+#include <xvm/abi.h>
 
 namespace xvm {
 namespace abi {
 
-enum OpCode : uint8_t {
+using Intstruction = u16;
+
+enum OpCode : u8 {
   NOP,
   HALT,
   RESET,
@@ -47,19 +49,23 @@ enum OpCode : uint8_t {
   RET
 };
 
-enum AddressingMode : uint8_t {
-  IMM1 = 0b01,
-  IMM2 = 0b10,
-  IND  = 0b11,
-  STK  = 0b00
+enum AddressingMode : u8 {
+  _NONE = 0,
+  STK = 0b0001, // Stack
+  IMM = 0b0010, // Immediate
+  ABS = 0b0011, // Absolute (Indirect)
+  PRO = 0b0100, // Positive Relative Offset (Indirect)
+  NRO = 0b0101, // Negative Relative Offset (Indirect)
 };
 
 std::string addressingModeToString(AddressingMode mode);
 std::string opCodeToString(OpCode opcode);
 
-uint8_t encodeInstruction(const AddressingMode mode, OpCode opcode);
-AddressingMode extractMode(uint8_t byte);
-OpCode extractOpcode(uint8_t byte);
+Intstruction encodeInstruction(const AddressingMode mode1, const AddressingMode mode2, const OpCode opcode);
+u8 encodeFlags(const AddressingMode mode1, const AddressingMode mode2);
+AddressingMode extractModeArg1(u8 flags);
+AddressingMode extractModeArg2(u8 flags);
+void decodeIntstruction(const Intstruction instruction, AddressingMode& mode1, AddressingMode& mode2, OpCode& opcode);
 
 int disassembleInstruction(const uint8_t* data, int offset = 0);
 

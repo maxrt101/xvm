@@ -2,86 +2,37 @@
 #define _XVM_CONFIG_H_ 1
 
 #include <functional>
+#include <vector>
 #include <string>
+#include <map>
 #include <xvm/abi.h>
-
 
 namespace xvm {
 namespace config {
 
-enum class Type {
-  NONE,       // Doesn't exist
-  STRING,
-  INT,
-  FLOAT,
-  BOOL,
-  VOIDPTR
-};
-
-struct Value {
-  config::Type m_type;
-
-  Value(config::Type type);
-  virtual ~Value();
-
-  template <typename T>
-  inline T* as() {
-    return (T*)this;
-  }
-};
-
-struct StringValue : public Value {
-  std::string m_data;
-
-  StringValue();
-};
-
-struct FloatValue : public Value {
-  float m_data;
-
-  FloatValue();
-};
-
-struct IntValue : public Value {
-  int m_data;
-
-  IntValue();
-};
-
-struct BoolValue : public Value {
-  bool m_data;
-
-  BoolValue();
-};
-
-struct VoidPtrValue : public Value {
-  void* m_data;
-
-  VoidPtrValue();
-};
-
-using CallbackType = std::function<void(Value*)>;
+using CallbackType = std::function<void(std::string)>;
 
 void initialize();
-bool exists(const std::string& name);
+bool exists(const std::string& key);
+std::string get(const std::string& key);
+std::string getOr(const std::string& key, const std::string& defaultValue);
+std::map<std::string, std::string>& getAll();
 std::vector<std::string> getKeys();
-Type getType(const std::string& name);
-void onUpdate(const std::string& name, CallbackType cb);
+std::string format(const std::string& value);
 
-void setFromString(const std::string& name, const std::string& value);
-std::string getAsString(const std::string& name);
+template <typename T>
+void set(const std::string& key, const T& value) {
+  set(key, std::to_string(value));
+}
 
-std::string getString(const std::string& name);
-int32_t getInt(const std::string& name);
-float getFloat(const std::string& name);
-bool getBool(const std::string& name);
-void* getVoidPtr(const std::string& name);
+template <>
+void set(const std::string& key, const std::string& value);
 
-void setString(const std::string& name, const std::string& value);
-void setInt(const std::string& name, int32_t value);
-void setFloat(const std::string& name, float value);
-void setBool(const std::string& name, bool value);
-void setVoidPtr(const std::string& name, void* value);
+void set(const std::string& key, const char* value);
+
+int asInt(const std::string& key);
+float asFloat(const std::string& key);
+bool asBool(const std::string& key);
 
 }; /* namespace config */
 }; /* namespace xvm */

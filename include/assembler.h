@@ -10,8 +10,9 @@
 #include <string>
 #include <vector>
 
+#include <xvm/abi.h>
 #include <xvm/bytecode.h>
-#include <xvm/binary.h>
+#include <xvm/executable.h>
 
 namespace xvm {
 
@@ -27,6 +28,7 @@ enum class TokenType : uint8_t {
   DOLLAR,
   PLUS,
   MINUS,
+  STAR,
 };
 
 struct Token {
@@ -41,11 +43,12 @@ struct Token {
   bool operator==(const Token& t) const;
   bool operator==(const std::string& s) const;
 
-  int32_t toNumber();
+  i32 toNumber();
 };
 
 struct LabelMention {
-  int32_t address = 0;
+  i32 address = 0;
+  u8 argumentNumber;
 };
 
 struct Label {
@@ -60,12 +63,13 @@ struct Variable {
   };
 
   struct Mention {
-    int32_t address;
+    i32 address;
+    u8 argumentNumber;
     bool isDeref = false;
   };
 
   std::string name;
-  int32_t address = 0;
+  i32 address = 0;
   Type type;
   int count = 1;
   std::vector<Mention> mentions;
@@ -85,11 +89,14 @@ class Assembler {
   std::vector<std::string> m_includeFolders;
   std::vector<std::string> m_included;
 
-  std::vector<uint8_t> m_code;
+  std::vector<u8> m_code;
   std::unordered_map<std::string, Label> m_labels;
   std::unordered_map<std::string, Variable> m_variables;
   std::unordered_map<std::string, int> m_syscalls;
   std::unordered_map<std::string, std::vector<Token>> m_defines;
+
+  std::vector<std::string> m_exported;
+  bool m_exportAll = false;
 
   const char* m_start = nullptr;
   const char* m_current = nullptr;
@@ -123,8 +130,10 @@ class Assembler {
   void parse();
   void patchLabels();
   void patchVariables();
+  void patchAddressingMode(i32 labelAddress, i32 mentionAddress, u8 argumentNumber);
 
-  int32_t getAddress();
+  // int32_t getAddress(u8 arg, i32 flagsOffset); // ???
+  int32_t getAddress(u8 argumentNumber = 1);
   Token getNextToken();
 
   void skipWhitespace();
@@ -139,7 +148,7 @@ class Assembler {
   void define();
   void undef();
 
-  void pushOpcode(abi::AddressingMode mode, abi::OpCode opcode);
+  void pushOpcode(abi::OpCode opcode, abi::AddressingMode mode1, abi::AddressingMode mode2 = abi::_NONE);
   void pushByte(uint8_t value);
   void pushInt16(int16_t value);
   void pushInt32(int32_t value);

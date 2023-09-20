@@ -1,11 +1,13 @@
-#ifndef _XVM_BINARY_H_
-#define _XVM_BINARY_H_ 1
+#ifndef _XVM_EXECUTABLE_H_
+#define _XVM_EXECUTABLE_H_ 1
 
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <xvm/abi.h>
 
 #define XVM_MAGIC 0xdeadbeef
+#define XVM_SECTION_MAGIC 0xdeadbeef
 #define XVM_BAD_MAGIC -1U
 
 namespace xvm {
@@ -26,38 +28,47 @@ N+12    u32  RESERVED (checksum)
 N+16    *    DATA
 */
 
-enum class SectionType : uint32_t {
-  CODE    = 1,
-  DATA    = 2,
-  SYMBOLS = 3,
+enum class SectionType : u32 {
+  CODE        = 1,
+  DATA        = 2, // ?
+  SYMBOLS     = 3,
+  RELOCATIONS = 4,
+  RUNINFO     = 5,
 };
 
-enum class SymbolFlags : uint16_t {
+enum class SymbolFlags : u32 {
   LABEL     = 0x1,
   PROCEDURE = 0x2,
   VARIABLE  = 0x4,
+  ENTRY     = 0x8,
+  EXTERN    = 0x10,
 };
 
 struct Executable {
   struct Section {
-    std::string label;
+    u32 magic;
     SectionType type;
-    uint32_t checksum;
-    std::vector<uint8_t> data;
+    u32 addr;
+    u32 checksum;
+    std::string label;
+    std::vector<u8> data;
 
    public:
+    Section() = default;
+    Section(SectionType type, std::string label, std::vector<u8> data, u32 addr = -1U);
+
     size_t size() const;
 
-    std::vector<uint8_t> toBytes() const;
-    static Section fromBuffer(const uint8_t* data, size_t offset);
+    std::vector<u8> toBytes() const;
+    static Section fromBuffer(const u8* data, size_t offset);
 
     std::vector<std::string> getStringLine() const;
     static const std::vector<std::string> getFieldNames();
   };
 
-  uint32_t magic = XVM_BAD_MAGIC;
-  uint32_t version = 0;
-  uint32_t flags = 0;
+  u32 magic = XVM_BAD_MAGIC;
+  u32 version = 0;
+  u32 flags = 0;
   std::vector<Section> sections;
 
  public:
@@ -67,18 +78,20 @@ struct Executable {
 
   void disassemble() const;
 
-  std::vector<uint8_t> toBytes() const;
+  std::vector<u8> toBytes() const;
   void toFile(const std::string& filename) const;
 
-  static Executable fromBuffer(const uint8_t* data);
+  static Executable fromBuffer(const u8* data);
   static Executable fromFile(const std::string& filename);
 };
 
+// Special Sections
+
 struct SymbolTable {
   struct Symbol {
-    uint32_t address;
-    uint16_t flags;
-    uint16_t size;
+    u32 address;
+    u16 flags;
+    u16 size;
     std::string label;
 
     bool isLabel() const;
@@ -91,12 +104,12 @@ struct SymbolTable {
 
   std::vector<Symbol> symbols;
 
-  void addSymbol(uint32_t address, const std::string& label, uint16_t flags = (uint16_t)SymbolFlags::LABEL, uint16_t data_width = 0);
+  void addSymbol(u32 address, const std::string& label, u16 flags = (u16)SymbolFlags::LABEL, u16 data_width = 0);
 
-  Symbol& getByAddress(uint32_t address);
+  Symbol& getByAddress(u32 address);
   Symbol& getByLabel(const std::string& label);
 
-  bool hasAddress(uint32_t address) const;
+  bool hasAddress(u32 address) const;
   bool hasLabel(const std::string& label) const;
 
   Executable::Section toSection(const std::string& label = "symbols") const;
@@ -104,8 +117,20 @@ struct SymbolTable {
   static SymbolTable fromSection(const Executable::Section& section);
 };
 
+struct RelocationTable {
+  struct RelocationEntry {
+    std::string label;
+    // RelocationType type;
+    std::vector<u32> mentions; // within executable (or even code section?)
+  };
+
+  std::vector<RelocationEntry> entries;
+
+  //
+};
+
 std::string sectionTypeToString(SectionType type);
 
 } /* namespace xvm */
 
-#endif
+#endif /* _XVM_EXECUTABLE_H_ */

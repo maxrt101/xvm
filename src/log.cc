@@ -60,7 +60,7 @@ void xvm::logf(LogLevel level, const std::string format, ...) {
 }
 
 void xvm::debug(int debugLevel, const std::string format, ...) {
-  if (config::getInt("debug") < debugLevel) {
+  if (config::asInt("debug") < debugLevel) {
     return;
   }
 
@@ -68,7 +68,7 @@ void xvm::debug(int debugLevel, const std::string format, ...) {
 }
 
 void xvm::debug(const std::string format, ...) {
-  if (config::getInt("debug") == 0) {
+  if (config::asInt("debug") == 0) {
     return;
   }
 

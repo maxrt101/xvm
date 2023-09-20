@@ -5,15 +5,15 @@
 #include <cctype>
 
 void xvm::abi::readInt16(N32& result, const uint8_t* data, size_t offset) {
-  result.u8[0] = data[offset];
-  result.u8[1] = data[offset+1];
+  result._u8[0] = data[offset];
+  result._u8[1] = data[offset+1];
 }
 
 void xvm::abi::readInt32(N32& result, const uint8_t* data, size_t offset) {
-  result.u8[0] = data[offset];
-  result.u8[1] = data[offset+1];
-  result.u8[2] = data[offset+2];
-  result.u8[3] = data[offset+3];
+  result._u8[0] = data[offset];
+  result._u8[1] = data[offset+1];
+  result._u8[2] = data[offset+2];
+  result._u8[3] = data[offset+3];
 }
 
 void xvm::abi::hexdump(const uint8_t* data, size_t length) {
