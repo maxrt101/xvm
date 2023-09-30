@@ -25,6 +25,8 @@ inline void printTable(const std::vector<std::string>& fields, std::vector<T>& v
   printTable(fields, lines);
 }
 
+[[noreturn]] void die(int returnCode = 1);
+
 } /* namespace xvm */
 
 #endif

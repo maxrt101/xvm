@@ -39,7 +39,6 @@ int xvm::load(VM& vm, Executable& exe) {
     }
   }
 
-  // xvm::VM vm(xvm::config::asInt("ram-size"));
   vm.loadRegion(0, code.data.data(), code.data.size());
   
   if (exe.hasSection("symbols")) {

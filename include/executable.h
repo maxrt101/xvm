@@ -128,8 +128,7 @@ struct RelocationTable {
     };
 
     std::string label;
-    // RelocationType type; // FIXME: needed?
-    std::vector<SymbolMention> mentions; // within executable (or even code section?)
+    std::vector<SymbolMention> mentions;
   };
 
   std::vector<RelocationEntry> relocations;
