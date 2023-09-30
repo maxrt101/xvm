@@ -21,7 +21,7 @@ static void printVersion() {
 
 static void printHelp(const char* argv0) {
   printVersion();
-  printf("Usage: %s COMMAND [OPTIONS]\n", argv0);
+  printf("Usage: %s [OPTIONS] COMMAND [ARGS..]\n", argv0);
   printf("Commands:\n");
   printf("  help          - Shows this message\n");
   printf("  version       - Shows version\n");
@@ -30,8 +30,7 @@ static void printHelp(const char* argv0) {
   printf("  runsrc FILE   - Runs source file direclty (without saving binary)\n");
   printf("  dump FILE     - Dumps info about compiled file\n");
   printf("  link FILES    - Link multiple compiled files\n");
-  // dump-section
-  // disect ?
+  // TODO: dump-section disect
   printf("Options:\n");
   printf("  -s, --setopt OPTION=VALUE - Sets option\n");
   printf("  -o, --output FILE         - Sets output file\n");
@@ -141,6 +140,24 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
   return 0;
 }
 
+static int link(const std::vector<std::string>& files, const std::string& outputFile) {
+  std::vector<xvm::Executable> exes;
+
+  for (const auto& file : files) {
+    if (!xvm::isFileExists(file)) {
+      xvm::error("File not exists: '%s'", file.c_str());
+      return -1;
+    }
+    exes.push_back(xvm::Executable::fromFile(file));
+  }
+
+  auto exe = xvm::link(exes);
+
+  exe.toFile(outputFile);
+
+  return 0;
+}
+
 static int dump(const std::string& filename) {
   if (!xvm::isFileExists(filename)) {
     xvm::error("File not exists: '%s'", filename.c_str());
@@ -213,52 +230,14 @@ static int dump(const std::string& filename) {
   return 0;
 }
 
-static int link(const std::vector<std::string>& files, const std::string& outputFile) {
-  std::vector<xvm::Executable> exes;
-
-  for (const auto& file : files) {
-    if (!xvm::isFileExists(file)) {
-      xvm::error("File not exists: '%s'", file.c_str());
-      return -1;
-    }
-    exes.push_back(xvm::Executable::fromFile(file));
-  }
-
-  auto exe = xvm::link(exes);
-
-  exe.toFile(outputFile);
-
-  return 0;
-}
-
 static int test() {
-
-  xvm::RelocationTable table;
-
-  table.relocations.push_back({"test035", {{200, 1}, {354, 2}, {8002, 1}}});
-  table.relocations.push_back({"label", {{1, 2}, {101, 1}, {10001, 2}}});
-
-  auto section = table.toSection();
-
-  xvm::abi::hexdump(section.data.data(), section.data.size());
-
-  auto deserialized = xvm::RelocationTable::fromSection(section);
-
-  for (int i = 0; i < deserialized.relocations.size(); i++) {
-    printf("%d: '%s': ", i, deserialized.relocations[i].label.c_str());
-    for (int j = 0; j < deserialized.relocations[i].mentions.size(); j++) {
-      printf("(%u %u) ", deserialized.relocations[i].mentions[j].address, (u32) deserialized.relocations[i].mentions[j].argumentNumber);
-    }
-    printf("\n");
-  }
-
   return 0;
 }
 
 int main(int argc, char ** argv) {
   xvm::config::initialize();
 
-  std::string command; // repl?
+  std::string command;
   std::vector<std::string> inputFilenames;
   std::string outputFilename = "out.xbin";
 
@@ -292,12 +271,6 @@ int main(int argc, char ** argv) {
       } else {
         inputFilenames.push_back(argv[i]);
       }
-      /*} else if (inputFilename.empty()) {
-        inputFilename = argv[i];
-      } else {
-        xvm::error("Unrecognized parameter: '%s'", argv[i]);
-        return -1;
-      }*/
     }
   }
 

@@ -68,3 +68,7 @@ void xvm::printTable(const std::vector<std::string>& fields, std::vector<std::ve
   }
   printTableBorder(lengths);
 }
+
+[[noreturn]] void xvm::die(int returnCode) {
+  exit(returnCode);
+}

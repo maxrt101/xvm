@@ -2,38 +2,13 @@
 #include <xvm/bytecode.h>
 #include <xvm/version.h>
 #include <xvm/config.h>
+#include <xvm/utils.h>
 #include <xvm/abi.h>
 #include <xvm/log.h>
 
 #include <cstdlib>
 
 using namespace xvm;
-
-/*static void patchLabels(u8* code, ) {
-  using namespace abi;
-
-  for (auto& label : m_labels) {
-    // debug(2, "Label: '%s' at 0x%x", label.first.c_str(), label.second.address);
-    for (auto mention : label.second.mentions) {
-      if (label.second.address == -1) {
-        error("Unknown label: %s", label.first.c_str());
-        // m_hadError = true;
-      }
-      N32 value;
-      if (config::asBool("pic")) {
-        patchAddressingMode(label.second.address, mention.address, mention.argumentNumber);
-        value._i32 = std::abs(label.second.address - mention.address);
-      } else {
-        value._i32 = label.second.address;
-      }
-      code[mention.address]   += value._u8[0];
-      code[mention.address+1] += value._u8[1];
-      code[mention.address+2] += value._u8[2];
-      code[mention.address+3] += value._u8[3];
-      // debug(2, "Label '%s' mention at 0x%x patched", label.first.c_str(), mention.address);
-    }
-  }
-}*/
 
 static void patchAddressingMode(u8* code, i32 labelAddress, i32 mentionAddress, u8 argumentNumber) {
   using namespace abi;
@@ -79,6 +54,11 @@ xvm::Executable xvm::link(const std::vector<Executable>& objects) {
     globalCodeOffset += codeSection.data.size();
   }
   for (int i = 0; i < objects.size(); i++) {
+    if (!objects[i].hasSection("symbols")) {
+      fatal("No 'symbols' section present in object file, can't link");
+      die();
+    }
+
     auto objectSymbolTable = SymbolTable::fromSection(objects[i].getSection("symbols"));
 
     for (const auto& symbol : objectSymbolTable.symbols) {
@@ -86,25 +66,12 @@ xvm::Executable xvm::link(const std::vector<Executable>& objects) {
     }
   }
 
-
-  /*
-  object1.xbin
-    symbols:
-      start
-      end
-      bar
-    relocations:
-      foo
-
-  object2.xbin
-    symbols:
-      foo
-    relocations:
-      bar
-
-  */
-
   for (int i = 0; i < objects.size(); i++) {
+    if (!objects[i].hasSection("relocations")) {
+      fatal("No 'relocations' section present in object file, can't link");
+      die();
+    }
+
     auto objectRelocationTable = RelocationTable::fromSection(objects[i].getSection("relocations"));
   
     for (auto relocation : objectRelocationTable.relocations) {
@@ -114,20 +81,6 @@ xvm::Executable xvm::link(const std::vector<Executable>& objects) {
       relocationTable.relocations.push_back(relocation);
     }
   }
-
-  // std::remove_if(
-  //   symbolTable.symbols.begin(),
-  //   symbolTable.symbols.end(),
-  //   [&symbolTable](const auto& symbol) {
-  //     return symbol.isExtern() && std::find_if(
-  //       symbolTable.symbols.begin(),
-  //       symbolTable.symbols.end(),
-  //       [&symbol](const auto& symbol2) {
-  //         return symbol2.label == symbol.label;
-  //       }
-  //     ) != symbolTable.symbols.end();
-  //   }
-  // );
 
   for (const auto& symbol : symbolTable.symbols) {
     bool hasNonExternCounterpart = std::find_if(
@@ -150,17 +103,10 @@ xvm::Executable xvm::link(const std::vector<Executable>& objects) {
       const auto& symbol = resultSymbolTable.getByLabel(relocation.label);
 
       for (const auto& mention : relocation.mentions) {
-        // if (label.second.address == -1) {
-        //   error("Unknown label: %s", label.first.c_str());
-        //   // m_hadError = true;
-        // }
-        printf("patch relocation symbol=%s symboladdr=0x%x mentionaddr=0x%x\n", symbol.label.c_str(), symbol.address, mention.address);
         abi::N32 value;
         if (config::asBool("pic")) {
-          printf("relocation (pic): sym=0x%x (%d) ref=0x%x (%d)\n", symbol.address, symbol.address, mention.address, mention.address);
           patchAddressingMode(code.data(), symbol.address, mention.address, mention.argumentNumber);
           value._i32 = std::abs(symbol.address - mention.address); // TODO: fix signed/unsiged mess
-          printf("value = 0x%x (%d)\n", value._i32, value._i32);
         } else {
           value._i32 = symbol.address;
         }
@@ -168,7 +114,6 @@ xvm::Executable xvm::link(const std::vector<Executable>& objects) {
         code[mention.address+1] = value._u8[1];
         code[mention.address+2] = value._u8[2];
         code[mention.address+3] = value._u8[3];
-        // debug(2, "Label '%s' mention at 0x%x patched", label.first.c_str(), mention.address);
       }
     } else {
       resultRelocationTable.relocations.push_back(relocation);
