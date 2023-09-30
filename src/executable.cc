@@ -89,13 +89,17 @@ bool xvm::SymbolTable::Symbol::isVariable() const {
   return flags & (u16) SymbolFlags::VARIABLE;
 }
 
+bool xvm::SymbolTable::Symbol::isExtern() const {
+  return flags & (u16) SymbolFlags::EXTERN;
+}
+
 std::vector<std::string> xvm::SymbolTable::Symbol::getStringLine() const {
   char buffer[32] = {0};
   snprintf(buffer, sizeof buffer, "0x%x", address);
 
   return {
     buffer,
-    std::string(isLabel() ? "L" : "-") + (isProcedure() ? "P" : "-") + (isVariable() ? "V" : "-"),
+    std::string(isLabel() ? "L" : "-") + (isProcedure() ? "P" : "-") + (isVariable() ? "V" : "-") + (isExtern() ? "X" : "-"),
     std::to_string(size),
     label
   };
@@ -105,11 +109,11 @@ const std::vector<std::string> xvm::SymbolTable::Symbol::getFieldNames() {
   return {"Addr", "Flags", "Size", "Label"};
 }
 
-void xvm::SymbolTable::addSymbol(u32 address, const std::string& label, u16 flags, u16 size) {
+void xvm::SymbolTable::addSymbol(i32 address, const std::string& label, u16 flags, u16 size) {
   symbols.push_back({address, flags, size, label});
 }
 
-xvm::SymbolTable::Symbol& xvm::SymbolTable::getByAddress(u32 address) {
+xvm::SymbolTable::Symbol& xvm::SymbolTable::getByAddress(i32 address) {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return symbol;
@@ -127,7 +131,7 @@ xvm::SymbolTable::Symbol& xvm::SymbolTable::getByLabel(const std::string& label)
   throw "No such symbol";
 }
 
-bool xvm::SymbolTable::hasAddress(u32 address) const {
+bool xvm::SymbolTable::hasAddress(i32 address) const {
   for (auto& symbol : symbols) {
     if (symbol.address == address) {
       return true;
@@ -182,7 +186,7 @@ xvm::SymbolTable xvm::SymbolTable::fromSection(const Executable::Section& sectio
     Symbol symbol;
 
     readInt32(n, section.data.data(), i);
-    symbol.address = n._u32;
+    symbol.address = n._i32;
 
     readInt16(n, section.data.data(), i += 4);
     symbol.flags = n._u16[0];
@@ -197,6 +201,66 @@ xvm::SymbolTable xvm::SymbolTable::fromSection(const Executable::Section& sectio
     }
 
     table.symbols.push_back(symbol);
+  }
+
+  return table;
+}
+
+xvm::Executable::Section xvm::RelocationTable::toSection(const std::string& label) const {
+  Executable::Section section;
+  abi::N32 n;
+
+  auto push_u32 = [&n, &section] {
+    for (int i = 0; i < 4; i++)
+      section.data.push_back(n._u8[i]);
+  };
+
+  section.label = label;
+  section.type = SectionType::RELOCATIONS;
+  section.checksum = 0;
+
+  for (auto& relocation : relocations) {
+    n._i32 = relocation.mentions.size();
+    push_u32();
+
+    for (int i = 0; i < relocation.mentions.size(); i++) {
+      n._i32 = relocation.mentions[i].address;
+      push_u32();
+      section.data.push_back(relocation.mentions[i].argumentNumber);
+    }
+
+    for (int i = 0; i < relocation.label.size(); i++)
+      section.data.push_back(relocation.label[i]);
+
+    section.data.push_back(0);
+  }
+
+  return section;
+}
+
+xvm::RelocationTable xvm::RelocationTable::fromSection(const Executable::Section& section) {
+  RelocationTable table;
+  abi::N32 n;
+
+  for (int i = 0; i < section.data.size(); ) {
+    RelocationEntry entry;
+
+    readInt32(n, section.data.data(), i);
+    int mentionsSize = n._u32;
+
+    i += 4;
+
+    for (int j = 0; j < mentionsSize; j++) {
+      readInt32(n, section.data.data(), i);
+      i += 4;
+      entry.mentions.push_back({n._i32, section.data[i++]});
+    }
+
+    for (char c = section.data[i++]; c != '\0'; c = section.data[i++]) {
+      entry.label.push_back(c);
+    }
+
+    table.relocations.push_back(entry);
   }
 
   return table;
@@ -366,9 +430,10 @@ xvm::Executable xvm::Executable::fromFile(const std::string& filename) {
 
 std::string xvm::sectionTypeToString(SectionType type) {
   switch (type) {
-    case SectionType::CODE:    return "code";
-    case SectionType::DATA:    return "data";
-    case SectionType::SYMBOLS: return "symbols";
-    default:                   return "<error>";
+    case SectionType::CODE:        return "code";
+    case SectionType::DATA:        return "data";
+    case SectionType::SYMBOLS:     return "symbols";
+    case SectionType::RELOCATIONS: return "relocations";
+    default:                       return "<error>";
   }
 }

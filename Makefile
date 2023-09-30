@@ -17,6 +17,8 @@ SRC     :=  src/main.cc \
             src/syscalls.cc \
             src/config.cc \
             src/log.cc \
+            src/loader.cc \
+            src/linker.cc \
             src/assembler.cc \
             src/utils.cc \
             src/bus.cc \
