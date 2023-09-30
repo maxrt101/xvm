@@ -27,7 +27,7 @@ SRC     :=  src/main.cc \
             src/syscalls/sleep.cc \
             src/syscalls/breakpoint.cc
 
-$(info [x] xvm v0.1.2 dev)
+$(info [x] xvm v0.2.0)
 
 ifeq ($(DEBUG),1)
 $(info [!] Debug on)
