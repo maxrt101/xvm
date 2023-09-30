@@ -3,6 +3,8 @@
 #include <xvm/log.h>
 #include <xvm/utils.h>
 #include <xvm/config.h>
+#include <xvm/loader.h>
+#include <xvm/linker.h>
 #include <xvm/version.h>
 #include <xvm/assembler.h>
 #include <xvm/executable.h>
@@ -27,8 +29,9 @@ static void printHelp(const char* argv0) {
   printf("  run FILE      - Runs compiled file\n");
   printf("  runsrc FILE   - Runs source file direclty (without saving binary)\n");
   printf("  dump FILE     - Dumps info about compiled file\n");
-  // link
+  printf("  link FILES    - Link multiple compiled files\n");
   // dump-section
+  // disect ?
   printf("Options:\n");
   printf("  -s, --setopt OPTION=VALUE - Sets option\n");
   printf("  -o, --output FILE         - Sets output file\n");
@@ -90,46 +93,10 @@ static int run(const std::string& filename) {
 
   xvm::Executable exe = xvm::Executable::fromFile(filename);
 
-  if (exe.magic != XVM_MAGIC) {
-    xvm::error(exe.magic == XVM_BAD_MAGIC ? "Error opening/reading executable" : "Bad file");
-    return 1;
-  }
-
-  if (!exe.hasSection("code")) {
-    xvm::error("Executable loading failed: Missing code section");
-    return 1;
-  }
-
-  auto& code = exe.getSection("code");
-
-  if (xvm::config::asBool("hexdump")) {
-    printf("=== Hexdump ===\n");
-    auto bytes = exe.toBytes();
-    xvm::abi::hexdump(bytes.data(), bytes.size());
-  }
-
-  if (xvm::config::asBool("print-symbol-table") && exe.hasSection("symbols")) {
-    printf("=== Symbols ===\n");
-    auto table = xvm::SymbolTable::fromSection(exe.getSection("symbols"));
-    xvm::printTable(xvm::SymbolTable::Symbol::getFieldNames(), table.symbols);
-  }
-
-  if (xvm::config::asBool("disasm")) {
-    printf("=== Disassembly ===\n");
-    if (xvm::config::asBool("fancy-disasm")) {
-      exe.disassemble();
-    } else {
-      for (int i = 0; i < code.data.size(); ) {
-        i = xvm::abi::disassembleInstruction(code.data.data(), i);
-      }
-    }
-  }
-
   xvm::VM vm(xvm::config::asInt("ram-size"));
-  vm.loadRegion(0, code.data.data(), code.data.size());
-  
-  if (exe.hasSection("symbols")) {
-    vm.loadSymbols(xvm::SymbolTable::fromSection(exe.getSection("symbols")));
+
+  if (xvm::load(vm, exe)) {
+    return 1;
   }
 
   if (xvm::config::asInt("debug") > 0) {
@@ -159,41 +126,10 @@ static int runSrc(const std::string& filename, std::vector<std::string>& include
     return -1;
   }
 
-  if (!exe.hasSection("code")) {
-    xvm::error("Compilation failed: Missing code section");
-    return 1;
-  }
-
-  auto& code = exe.getSection("code");
-
-  if (xvm::config::asBool("hexdump")) {
-    printf("=== Hexdump ===\n");
-    auto bytes = exe.toBytes();
-    xvm::abi::hexdump(bytes.data(), bytes.size());
-  }
-
-  if (xvm::config::asBool("print-symbol-table") && exe.hasSection("symbols")) {
-    printf("=== Symbols ===\n");
-    auto table = xvm::SymbolTable::fromSection(exe.getSection("symbols"));
-    xvm::printTable(xvm::SymbolTable::Symbol::getFieldNames(), table.symbols);
-  }
-
-  if (xvm::config::asBool("disasm")) {
-    printf("=== Disassembly ===\n");
-    if (xvm::config::asBool("fancy-disasm")) {
-      exe.disassemble();
-    } else {
-      for (int i = 0; i < code.data.size(); ) {
-        i = xvm::abi::disassembleInstruction(code.data.data(), i);
-      }
-    }
-  }
-
   xvm::VM vm(xvm::config::asInt("ram-size"));
-  vm.loadRegion(0, code.data.data(), code.data.size());
 
-  if (exe.hasSection("symbols")) {
-    vm.loadSymbols(xvm::SymbolTable::fromSection(exe.getSection("symbols")));
+  if (xvm::load(vm, exe)) {
+    return 1;
   }
 
   if (xvm::config::asInt("debug") > 0) {
@@ -212,9 +148,10 @@ static int dump(const std::string& filename) {
   }
 
   xvm::Executable exe = xvm::Executable::fromFile(filename);
-  
+
   if (exe.magic == XVM_BAD_MAGIC) {
     xvm::error("Error opening/reading executable");
+    return 1;
   }
 
   printVersion();
@@ -254,6 +191,20 @@ static int dump(const std::string& filename) {
       xvm::printTable(xvm::SymbolTable::Symbol::getFieldNames(), table.symbols);
     }
 
+    if (section.type == xvm::SectionType::RELOCATIONS) {
+      auto table = xvm::RelocationTable::fromSection(section);
+
+      std::vector<std::vector<std::string>> lines;
+
+      for (const auto& relocation : table.relocations) {
+        for (const auto& mention : relocation.mentions) {
+          lines.push_back({relocation.label, std::to_string(mention.address), std::to_string(mention.argumentNumber)});
+        }
+      }
+
+      xvm::printTable({"name", "address", "arg"}, lines);
+    }
+
     if (section.type == xvm::SectionType::DATA) {
       xvm::abi::hexdump(section.data.data(), section.data.size());
     }
@@ -262,30 +213,44 @@ static int dump(const std::string& filename) {
   return 0;
 }
 
-#include <xvm/bytecode.h>
+static int link(const std::vector<std::string>& files, const std::string& outputFile) {
+  std::vector<xvm::Executable> exes;
 
-int test() {
-  // uint32_t m = XVM_MULTICHAR4('X', 'V', 'M', 'E');
+  for (const auto& file : files) {
+    if (!xvm::isFileExists(file)) {
+      xvm::error("File not exists: '%s'", file.c_str());
+      return -1;
+    }
+    exes.push_back(xvm::Executable::fromFile(file));
+  }
 
-  // printf("magic='%.4s'\n", (char*)&m);
+  auto exe = xvm::link(exes);
 
-  xvm::abi::N32 n;
-  n._i8[0] = 'X';
-  n._i8[1] = 'V';
-  n._i8[2] = 'M';
-  n._i8[3] = 'E';
+  exe.toFile(outputFile);
 
-  printf("magic=%x\n", n._u32);
-  printf("magic='%.4s'\n", (char*)&n);
-  printf("magic='%c%c%c%c'\n", n._u8[0], n._u8[1], n._u8[2], n._u8[3]);
+  return 0;
+}
 
-  printf("opcode=0x%x mode1=0x%x mode2=0x%x\n", xvm::abi::ADD, xvm::abi::STK, xvm::abi::ABS);
-  auto i = xvm::abi::encodeInstruction(xvm::abi::STK, xvm::abi::ABS, xvm::abi::ADD);
-  printf("encoded=0x%x\n", i);
-  xvm::abi::AddressingMode mode1, mode2;
-  xvm::abi::OpCode opcode;
-  xvm::abi::decodeIntstruction(i, mode1, mode2, opcode);
-  printf("decoded op=0x%x mode1=0x%x mode1=0x%x\n", opcode, mode1, mode2);
+static int test() {
+
+  xvm::RelocationTable table;
+
+  table.relocations.push_back({"test035", {{200, 1}, {354, 2}, {8002, 1}}});
+  table.relocations.push_back({"label", {{1, 2}, {101, 1}, {10001, 2}}});
+
+  auto section = table.toSection();
+
+  xvm::abi::hexdump(section.data.data(), section.data.size());
+
+  auto deserialized = xvm::RelocationTable::fromSection(section);
+
+  for (int i = 0; i < deserialized.relocations.size(); i++) {
+    printf("%d: '%s': ", i, deserialized.relocations[i].label.c_str());
+    for (int j = 0; j < deserialized.relocations[i].mentions.size(); j++) {
+      printf("(%u %u) ", deserialized.relocations[i].mentions[j].address, (u32) deserialized.relocations[i].mentions[j].argumentNumber);
+    }
+    printf("\n");
+  }
 
   return 0;
 }
@@ -294,7 +259,7 @@ int main(int argc, char ** argv) {
   xvm::config::initialize();
 
   std::string command; // repl?
-  std::string inputFilename;
+  std::vector<std::string> inputFilenames;
   std::string outputFilename = "out.xbin";
 
   std::vector<std::string> includeFolders;
@@ -324,12 +289,15 @@ int main(int argc, char ** argv) {
     } else {
       if (command.empty()) {
         command = argv[i];
-      } else if (inputFilename.empty()) {
+      } else {
+        inputFilenames.push_back(argv[i]);
+      }
+      /*} else if (inputFilename.empty()) {
         inputFilename = argv[i];
       } else {
         xvm::error("Unrecognized parameter: '%s'", argv[i]);
         return -1;
-      }
+      }*/
     }
   }
 
@@ -343,13 +311,15 @@ int main(int argc, char ** argv) {
   } else if (command == "test") { // DEBUG
     test();
   } else if (command == "compile") {
-    return compile(inputFilename, outputFilename, includeFolders);
+    return compile(inputFilenames[0], outputFilename, includeFolders);
   } else if (command == "run") {
-    return run(inputFilename);
+    return run(inputFilenames[0]);
   } else if (command == "runsrc") {
-    return runSrc(inputFilename, includeFolders);
+    return runSrc(inputFilenames[0], includeFolders);
   } else if (command == "dump") {
-    return dump(inputFilename);
+    return dump(inputFilenames[0]);
+  } else if (command == "link") {
+    return link(inputFilenames, outputFilename);
   } else {
     xvm::error("Unknown command: '%s'", command.c_str());
   }

@@ -96,6 +96,7 @@ class Assembler {
   std::unordered_map<std::string, std::vector<Token>> m_defines;
 
   std::vector<std::string> m_exported;
+  std::vector<std::string> m_externs;
   bool m_exportAll = false;
 
   const char* m_start = nullptr;

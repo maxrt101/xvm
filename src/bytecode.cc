@@ -77,7 +77,6 @@ void xvm::abi::decodeIntstruction(const Intstruction instruction, AddressingMode
   mode2 = extractModeArg2(flags);
 }
 
-
 int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
   AddressingMode mode[] = {
     extractModeArg1(data[offset]),
@@ -85,7 +84,7 @@ int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
   };
   OpCode opcode = (OpCode) data[++offset];
 
-  printf("0x%04x | %-8s %-4s %-4s ", offset,
+  printf("0x%04x | %-8s %-4s %-4s ", offset-1,
     opCodeToString(opcode).c_str(),
     addressingModeToString(mode[0]).c_str(),
     addressingModeToString(mode[1]).c_str());
@@ -124,7 +123,7 @@ int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
         switch (mode[i]) {
           case IMM:
             readInt32(result, data, offset+1);
-            printf("%d\n", result._i32);
+            printf("%d", result._i32);
             offset += 5;
             break;
           case ABS:
@@ -148,7 +147,7 @@ int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
       }
 
       printf("\n");
-      return (opcode == PUSH) ? offset : offset + 1;
+      return (opcode == PUSH || opcode == EQU) ? offset : offset + 1;
     }
     case SHR:
     case SHL: {
@@ -191,11 +190,11 @@ int xvm::abi::disassembleInstruction(const uint8_t* data, int offset) {
       printf("\n");
       return offset;
     }
-    case SYSCALL: { // TODO: ?
+    case SYSCALL: {
       if (mode[0] == IMM) {
         N32 result;
         readInt32(result, data, offset+1);
-        printf("0x%x\n", result._i32); // print syscall name from syscall table
+        printf("0x%x\n", result._i32); // TODO: print syscall name from syscall table
         return offset+5;
       }
       printf("\n");

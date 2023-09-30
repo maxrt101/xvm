@@ -133,32 +133,50 @@ int xvm::Assembler::assemble(Executable& exe, bool includeSymbols) {
     0
   ));
 
-  if (includeSymbols) {
-    SymbolTable table;
+  SymbolTable table;
+  RelocationTable relocations;
 
-    for (auto& label : m_labels) {
-      if (!m_exportAll && std::find(m_exported.begin(), m_exported.end(), label.first) == m_exported.end()) {
-        continue;
-      }
-      int size = 0;
-      uint16_t flags = 0;
-      if (m_variables.find(label.first) != m_variables.end()) {
-        flags |= (uint16_t) SymbolFlags::VARIABLE;
-        size = m_variables[label.first].size();
-      }
-      table.addSymbol(
-        label.second.address,
-        label.first,
-        flags | (uint16_t)(label.second.isProcedure ? SymbolFlags::PROCEDURE : SymbolFlags::LABEL),
-        size
-      );
+  for (auto& label : m_labels) {
+    if (!m_exportAll && std::find(m_exported.begin(), m_exported.end(), label.first) == m_exported.end()) {
+      continue;
     }
 
+    int size = 0;
+    u16 flags = 0;
+
+    if (m_variables.find(label.first) != m_variables.end()) {
+      flags |= (u16) SymbolFlags::VARIABLE;
+      size = m_variables[label.first].size();
+    }
+
+    if (std::find(m_externs.begin(), m_externs.end(), label.first) != m_externs.end()) {
+      flags |= (u16) SymbolFlags::EXTERN;
+
+      relocations.relocations.push_back({
+        label.first, {}
+      });
+
+      for (auto& mention : label.second.mentions) {
+        relocations.relocations.back().mentions.push_back({mention.address, mention.argumentNumber});
+      }
+    }
+
+    table.addSymbol(
+      label.second.address,
+      label.first,
+      flags | (u16)(label.second.isProcedure ? SymbolFlags::PROCEDURE : SymbolFlags::LABEL),
+      size
+    );
+  }
+
+  if (includeSymbols) {
     std::sort(table.symbols.begin(), table.symbols.end(),
       [](auto& lhs, auto& rhs) { return lhs.address < rhs.address; });
 
     exe.sections.push_back(table.toSection());
   }
+
+  exe.sections.push_back(relocations.toSection());
 
   return 0;
 }
@@ -535,7 +553,7 @@ void xvm::Assembler::patchLabels() { // TODO: check for unpatched labels
   for (auto& label : m_labels) {
     debug(2, "Label: '%s' at 0x%x", label.first.c_str(), label.second.address);
     for (auto mention : label.second.mentions) {
-      if (label.second.address == -1) {
+      if (label.second.address == -1 && std::find(m_externs.begin(), m_externs.end(), label.first) == m_externs.end()) {
         error("Unknown label: %s", label.first.c_str());
         m_hadError = true;
       }
@@ -591,7 +609,12 @@ void xvm::Assembler::patchVariables() {
         m_code[mention.address+1] = op; 
         debug(2, "Variable '%s' deref mention at 0x%x patched with %s", var.first.c_str(), mention.address, opCodeToString(op).c_str());
       } else {
-        value._i32 = var.second.address;
+        if (config::asBool("pic")) {
+          patchAddressingMode(var.second.address, mention.address, mention.argumentNumber);
+          value._i32 = std::abs(var.second.address - mention.address);
+        } else {
+          value._i32 = var.second.address;
+        }
         m_code[mention.address]   += value._u8[0];
         m_code[mention.address+1] += value._u8[1];
         m_code[mention.address+2] += value._u8[2];
@@ -645,8 +668,8 @@ void xvm::Assembler::parse() {
             m_variables[varname] = {};
           }
           m_variables[varname].mentions.push_back({static_cast<int32_t>(m_code.size()), 1, true});
-          // pushOpcode(NOP, _NONE);
-          pushInt32(0);
+          pushByte(0);
+          pushByte(NOP);
         } else {
           pushInt32(getAddress());
         }
@@ -1176,6 +1199,11 @@ void xvm::Assembler::parse() {
                 m_exported.erase(itr);
               }
             }
+          }
+        } else if (m_tokens[m_index] == "extern") {
+          while (isNextTokenOnSameLine()) {
+            Token externName = getNextToken();
+            m_externs.push_back(externName.str);
           }
         } else {
           asmError("Unknown directive '%s'", m_tokens[m_index].str.c_str());

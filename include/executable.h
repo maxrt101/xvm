@@ -34,6 +34,8 @@ enum class SectionType : u32 {
   SYMBOLS     = 3,
   RELOCATIONS = 4,
   RUNINFO     = 5,
+  // TODO: runinfo or some other section has to have a list of
+  // dynamic mlibraries to be linked before execution (stdlib, etc)
 };
 
 enum class SymbolFlags : u32 {
@@ -89,7 +91,7 @@ struct Executable {
 
 struct SymbolTable {
   struct Symbol {
-    u32 address;
+    i32 address;
     u16 flags;
     u16 size;
     std::string label;
@@ -97,6 +99,7 @@ struct SymbolTable {
     bool isLabel() const;
     bool isProcedure() const;
     bool isVariable() const;
+    bool isExtern() const;
 
     std::vector<std::string> getStringLine() const;
     static const std::vector<std::string> getFieldNames();
@@ -104,12 +107,12 @@ struct SymbolTable {
 
   std::vector<Symbol> symbols;
 
-  void addSymbol(u32 address, const std::string& label, u16 flags = (u16)SymbolFlags::LABEL, u16 data_width = 0);
+  void addSymbol(i32 address, const std::string& label, u16 flags = (u16)SymbolFlags::LABEL, u16 data_width = 0);
 
-  Symbol& getByAddress(u32 address);
+  Symbol& getByAddress(i32 address);
   Symbol& getByLabel(const std::string& label);
 
-  bool hasAddress(u32 address) const;
+  bool hasAddress(i32 address) const;
   bool hasLabel(const std::string& label) const;
 
   Executable::Section toSection(const std::string& label = "symbols") const;
@@ -119,14 +122,21 @@ struct SymbolTable {
 
 struct RelocationTable {
   struct RelocationEntry {
+    struct SymbolMention {
+      i32 address;
+      u8 argumentNumber;
+    };
+
     std::string label;
-    // RelocationType type;
-    std::vector<u32> mentions; // within executable (or even code section?)
+    // RelocationType type; // FIXME: needed?
+    std::vector<SymbolMention> mentions; // within executable (or even code section?)
   };
 
-  std::vector<RelocationEntry> entries;
+  std::vector<RelocationEntry> relocations;
 
-  //
+  Executable::Section toSection(const std::string& label = "relocations") const;
+
+  static RelocationTable fromSection(const Executable::Section& section);
 };
 
 std::string sectionTypeToString(SectionType type);
