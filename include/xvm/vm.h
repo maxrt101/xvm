@@ -49,6 +49,7 @@ class VM {
   SymbolTable m_symbols;
 
   bool m_running = false;
+  bool m_stop = false;
 
  public:
   VM(size_t ramSize = 1024);

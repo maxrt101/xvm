@@ -105,7 +105,7 @@ void xvm::VM::registerSyscall(int32_t number, const std::string& name, SyscallTy
 }
 
 void xvm::VM::stop() {
-  m_running = false;
+  m_stop = true;
 }
 
 void xvm::VM::reset() {
@@ -119,7 +119,7 @@ void xvm::VM::run() {
 
   m_running = true;
 
-  while (m_running && m_ip < m_bus.max()) {
+  while (m_running && !m_stop && m_ip < m_bus.max()) {
     uint8_t flags = next();
     uint8_t opcode = next();
 
