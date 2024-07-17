@@ -1,6 +1,5 @@
 #include <xvm/executable.h>
 #include <xvm/bytecode.h>
-#include <xvm/config.h>
 #include <xvm/log.h>
 #include <xvm/abi.h>
 
@@ -371,10 +370,14 @@ void xvm::Executable::toFile(const std::string& filename) const {
 
 xvm::Executable xvm::Executable::fromBuffer(const u8* data) {
   Executable exe;
-  
+
   abi::N32 n;
   readInt32(n, data, 0);
   exe.magic = n._u32;
+
+  if (exe.magic != XVM_MAGIC) {
+    return exe;
+  }
 
   readInt32(n, data, 4);
   exe.version = n._u32;

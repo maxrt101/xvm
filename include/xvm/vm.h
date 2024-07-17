@@ -6,8 +6,11 @@
 #include <xvm/stack.h>
 #include <xvm/executable.h>
 #include <xvm/bytecode.h>
-#include <xvm/devices/ram.h>
+#include "devices/ram.h"
+
+#ifdef XVM_FEATURE_VIDEO
 #include <xvm/devices/video.h>
+#endif
 
 #include <unordered_map>
 #include <functional>

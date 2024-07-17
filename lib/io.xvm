@@ -1,6 +1,8 @@
 
 %include "syscall.xvm"
 
+%export puts
+
 puts:      ; [strptr]
   dup
   deref8

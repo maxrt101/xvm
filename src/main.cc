@@ -9,11 +9,9 @@
 #include <xvm/assembler.h>
 #include <xvm/executable.h>
 
-#include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
-
 
 static void printVersion() {
   printf("xvm v%s\n", XVM_VERSION);
@@ -148,7 +146,15 @@ static int link(const std::vector<std::string>& files, const std::string& output
       xvm::error("File not exists: '%s'", file.c_str());
       return -1;
     }
-    exes.push_back(xvm::Executable::fromFile(file));
+
+    auto exe = xvm::Executable::fromFile(file);
+
+    if (exe.magic != XVM_MAGIC) {
+      xvm::error("File '%s' is not an xvm executable", file.c_str());
+      return -1;
+    }
+
+    exes.push_back(exe);
   }
 
   auto exe = xvm::link(exes);
@@ -166,7 +172,7 @@ static int dump(const std::string& filename) {
 
   xvm::Executable exe = xvm::Executable::fromFile(filename);
 
-  if (exe.magic == XVM_BAD_MAGIC) {
+  if (exe.magic != XVM_MAGIC) {
     xvm::error("Error opening/reading executable");
     return 1;
   }

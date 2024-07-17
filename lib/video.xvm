@@ -14,6 +14,7 @@
 %def i32 HEIGTH 480
 %def i32 VMEM   10000
 
+%export video_init video_set_rgba video_set_pixel_at video_update
 
 video_init:             ; [width, height, baseAddr]
   load32  WIDTH
