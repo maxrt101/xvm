@@ -1,6 +1,5 @@
 #include <xvm/syscalls.h>
 #include <xvm/log.h>
-#include <xvm/devices/video.h>
 
 #include <thread>
 

@@ -63,6 +63,8 @@ void xvm::sys_breakpoint(VM* vm) {
             "Usage: print code ADDR LEN\n"
             "Usage: print TYPE ADDR\n"
           );
+        } else {
+          printf("Unknown command, use 'help' to get list of available commands\n");
         }
       } else {
         printf("Available commands: help halt continue reset print getopt setopt config bus push pop set jump call\n");

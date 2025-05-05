@@ -8,7 +8,7 @@
 
 #define XVM_MAGIC 0xdeadbeef
 #define XVM_SECTION_MAGIC 0xdeadbeef
-#define XVM_BAD_MAGIC -1U
+#define XVM_BAD_MAGIC (-1U)
 
 namespace xvm {
 

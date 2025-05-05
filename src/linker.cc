@@ -106,7 +106,7 @@ xvm::Executable xvm::link(const std::vector<Executable>& objects) {
         abi::N32 value;
         if (config::asBool("pic")) {
           patchAddressingMode(code.data(), symbol.address, mention.address, mention.argumentNumber);
-          value._i32 = std::abs(symbol.address - mention.address); // TODO: fix signed/unsiged mess
+          value._i32 = std::abs(symbol.address - mention.address); // TODO: fix signed/unsigned mess
         } else {
           value._i32 = symbol.address;
         }
